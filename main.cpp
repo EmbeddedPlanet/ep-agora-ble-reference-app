@@ -20,7 +20,7 @@
 
 /** Device Information Strings */
 const char manufacturers_name[]	= "Embedded Planet";
-const char model_number[]			= "Agora BLE";
+const char model_number[]		= "Agora BLE";
 const char serial_number[]		= "123456789";
 const char hardware_revision[]	= "1.0";
 const char software_revision[]	= "1.0.0";
@@ -31,6 +31,10 @@ const char software_revision[]	= "1.0.0";
 #include "Si7021Service.h"
 #include "ICM20602Service.h"
 #include "LSM9DS1Service.h"
+#include "MAX44009Service.h"
+#include "VL53L0XService.h"
+#include "LEDService.h"
+#include "BatteryVoltageService.h"
 
 /** Standard Services */
 DeviceInformationService* deviceinfo_service;
@@ -40,6 +44,10 @@ BME680Service bme680_service;
 Si7021Service si7021_service;
 ICM20602Service icm20602_service;
 LSM9DS1Service lsm9ds1_service;
+MAX44009Service max44009_service;
+VL53L0XService vl53l0x_service;
+LEDService led_service;
+BatteryVoltageService battery_voltage_service;
 
 void start_services(BLE& ble) {
 
@@ -52,7 +60,10 @@ void start_services(BLE& ble) {
 	si7021_service.start(ble);
 	icm20602_service.start(ble);
 	lsm9ds1_service.start(ble);
-
+	max44009_service.start(ble);
+	vl53l0x_service.start(ble);
+	led_service.start(ble);
+	battery_voltage_service.start(ble);
 
 }
 
