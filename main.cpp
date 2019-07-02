@@ -28,12 +28,18 @@ const char software_revision[]	= "1.0.0";
 /** Services */
 #include "DeviceInformationService.h"
 #include "BME680Service.h"
+#include "Si7021Service.h"
+#include "ICM20602Service.h"
+#include "LSM9DS1Service.h"
 
 /** Standard Services */
 DeviceInformationService* deviceinfo_service;
 
 /** Custom Services */
 BME680Service bme680_service;
+Si7021Service si7021_service;
+ICM20602Service icm20602_service;
+LSM9DS1Service lsm9ds1_service;
 
 void start_services(BLE& ble) {
 
@@ -43,6 +49,10 @@ void start_services(BLE& ble) {
 
 	/** Start the custom services */
 	bme680_service.start(ble);
+	si7021_service.start(ble);
+	icm20602_service.start(ble);
+	lsm9ds1_service.start(ble);
+
 
 }
 
