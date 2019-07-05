@@ -68,6 +68,18 @@ public:
 
 	}
 
+	float get_voltage() const {
+		uint16_t len = sizeof(voltage);
+		server->read(battery_voltage_char.getValueHandle(), (uint8_t*) &voltage, &len);
+		return voltage;
+	}
+
+	void set_voltage(float voltage) {
+		this->voltage = voltage;
+		server->write(battery_voltage_char.getValueHandle(), (uint8_t*) &this->voltage,
+				sizeof(this->voltage));
+	}
+
 protected:
 
 	/** Descriptors (and their pointers...) */

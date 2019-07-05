@@ -23,6 +23,7 @@ const char manufacturers_name[]	= "Embedded Planet";
 const char model_number[]		= "Agora BLE";
 const char serial_number[]		= "123456789";
 const char hardware_revision[]	= "1.0";
+const char firmware_revision[]	= " ";
 const char software_revision[]	= "1.0.0";
 
 /** Services */
@@ -37,7 +38,7 @@ const char software_revision[]	= "1.0.0";
 #include "BatteryVoltageService.h"
 
 /** Standard Services */
-DeviceInformationService* deviceinfo_service;
+DeviceInformationService* device_info_service;
 
 /** Custom Services */
 BME680Service bme680_service;
@@ -52,8 +53,8 @@ BatteryVoltageService battery_voltage_service;
 void start_services(BLE& ble) {
 
 	/** Start the standard services */
-	deviceinfo_service = new DeviceInformationService(ble,
-			manufacturers_name, model_number, serial_number, hardware_revision, NULL, software_revision);
+	device_info_service = new DeviceInformationService(ble, manufacturers_name, model_number, serial_number,
+			hardware_revision, firmware_revision, software_revision);
 
 	/** Start the custom services */
 	bme680_service.start(ble);
@@ -67,10 +68,10 @@ void start_services(BLE& ble) {
 
 }
 
-void stop_servies(void) {
-	if(deviceinfo_service != NULL) {
-		delete deviceinfo_service;
-		deviceinfo_service = NULL;
+void stop_services(void) {
+	if(device_info_service != NULL) {
+		delete device_info_service;
+		device_info_service = NULL;
 	}
 }
 

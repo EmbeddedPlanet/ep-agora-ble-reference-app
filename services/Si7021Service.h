@@ -66,6 +66,29 @@ public:
 
 	}
 
+	uint16_t get_rel_humidity() const {
+		uint16_t len = sizeof(rel_humidity);
+		server->read(rel_humidity_char.getValueHandle(), (uint8_t*) &rel_humidity, &len);
+		return rel_humidity;
+	}
+
+	void set_rel_humidity(uint16_t rel_humidity) {
+		this->rel_humidity = rel_humidity;
+		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &rel_humidity, sizeof(rel_humidity));
+	}
+
+	int16_t get_temp_c() const {
+		uint16_t len = sizeof(temp_c);
+		server->read(temp_c_char.getValueHandle(), (uint8_t*) &temp_c, &len);
+		return temp_c;
+	}
+
+	void set_temp_c(int16_t temp_c) {
+		this->temp_c = temp_c;
+		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &this->rel_humidity,
+				sizeof(this->rel_humidity));
+	}
+
 protected:
 
 	/** Characteristics */

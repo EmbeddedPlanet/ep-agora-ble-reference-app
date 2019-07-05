@@ -68,6 +68,18 @@ public:
 
 	}
 
+	float get_als_reading() const {
+		uint16_t len = sizeof(als_reading);
+		server->read(als_char.getValueHandle(), (uint8_t*) &als_reading, &len);
+		return als_reading;
+	}
+
+	void set_als_reading(float als_reading) {
+		this->als_reading = als_reading;
+		server->write(als_char.getValueHandle(), (uint8_t*) &this->als_reading,
+				sizeof(this->als_reading));
+	}
+
 protected:
 
 	/** Descriptors (and their pointers...) */

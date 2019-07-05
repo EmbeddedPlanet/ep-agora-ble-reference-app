@@ -100,15 +100,93 @@ public:
 
 	}
 
-//	ble_error_t set_current_tag_id(const unsigned char* tag_id) const {
-//		return server->write(current_tag_id_char.getValueHandle(), tag_id, SENTRICON_TAG_ID_LENGTH);
-//	}
-//
-//	ble_error_t get_current_tag_id(unsigned char* tag_id) {
-//		uint16_t value_length = SENTRICON_TAG_ID_LENGTH;
-//		return server->read(current_tag_id_char.getValueHandle(), tag_id, &value_length);
-//	}
+	float get_estimated_b_voc() const {
+		uint16_t len = sizeof(estimated_bVOC);
+		server->read(estimated_bVOC_char.getValueHandle(), (uint8_t*) &estimated_bVOC, &len);
+		return estimated_bVOC;
+	}
 
+	void set_estimated_b_voc(float estimated_b_voc) {
+		estimated_bVOC = estimated_b_voc;
+		server->write(estimated_bVOC_char.getValueHandle(), (uint8_t*) &estimated_bVOC, sizeof(estimated_bVOC));
+	}
+
+	float get_estimated_co2() const {
+		uint16_t len = sizeof(estimated_co2);
+		server->read(estimated_co2_char.getValueHandle(), (uint8_t*) &estimated_co2, &len);
+		return estimated_co2;
+	}
+
+	void set_estimated_co2(float estimated_co2) {
+		this->estimated_co2 = estimated_co2;
+		server->write(estimated_co2_char.getValueHandle(), (uint8_t*) &this->estimated_co2, sizeof(this->estimated_co2));
+	}
+
+	uint32_t get_gas_resistance() const {
+		uint16_t len = sizeof(gas_resistance);
+		server->read(gas_resistance_char.getValueHandle(), (uint8_t*) &gas_resistance, &len);
+		return gas_resistance;
+	}
+
+	void set_gas_resistance(uint32_t gas_resistance) {
+		this->gas_resistance = gas_resistance;
+		server->write(gas_resistance_char.getValueHandle(), (uint8_t*) &this->gas_resistance, sizeof(this->gas_resistance));
+	}
+
+	uint8_t get_iaq_accuracy() const {
+		uint16_t len = sizeof(iaq_accuracy);
+		server->read(iaq_accuracy_char.getValueHandle(), (uint8_t*) &iaq_accuracy, &len);
+		return iaq_accuracy;
+	}
+
+	void set_iaq_accuracy(uint8_t iaq_accuracy) {
+		this->iaq_accuracy = iaq_accuracy;
+		server->write(iaq_accuracy_char.getValueHandle(), (uint8_t*) &this->iaq_accuracy, sizeof(this->iaq_accuracy));
+	}
+
+	uint16_t get_iaq_score() const {
+		uint16_t len = sizeof(iaq_score);
+		server->read(iaq_score_char.getValueHandle(), (uint8_t*) &iaq_score, &len);
+		return iaq_score;
+	}
+
+	void set_iaq_score(uint16_t iaq_score) {
+		this->iaq_score = iaq_score;
+		server->write(iaq_score_char.getValueHandle(), (uint8_t*) &this->iaq_score, sizeof(this->iaq_score));
+	}
+
+	uint32_t get_pressure() const {
+		uint16_t len = sizeof(pressure);
+		server->read(pressure_char.getValueHandle(), (uint8_t*) &pressure, &len);
+		return pressure;
+	}
+
+	void set_pressure(uint32_t pressure) {
+		this->pressure = pressure;
+		server->write(pressure_char.getValueHandle(), (uint8_t*) &this->pressure, sizeof(this->pressure));
+	}
+
+	uint16_t get_rel_humidity() const {
+		uint16_t len = sizeof(rel_humidity);
+		server->read(rel_humidity_char.getValueHandle(), (uint8_t*) &rel_humidity, &len);
+		return rel_humidity;
+	}
+
+	void set_rel_humidity(uint16_t rel_humidity) {
+		this->rel_humidity = rel_humidity;
+		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &this->rel_humidity, sizeof(this->rel_humidity));
+	}
+
+	int16_t get_temp_c() const {
+		uint16_t len = sizeof(temp_c);
+		server->read(temp_c_char.getValueHandle(), (uint8_t*) &temp_c, &len);
+		return temp_c;
+	}
+
+	void set_temp_c(int16_t temp_c) {
+		this->temp_c = temp_c;
+		server->write(temp_c_char.getValueHandle(), (uint8_t*) &this->temp_c, sizeof(this->temp_c));
+	}
 
 protected:
 

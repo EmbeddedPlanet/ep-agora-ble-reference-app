@@ -8,6 +8,8 @@
 #ifndef SERVICES_LED_SERVICE_H_
 #define SERVICES_LED_SERVICE_H_
 
+#include "drivers/DigitalOut.h"
+
 #include "platform/mbed_debug.h"
 #include "platform/mbed_toolchain.h"
 
@@ -39,7 +41,8 @@ public:
 		/** Num Characteristics */	sizeof(characteristics) /
 									sizeof(characteristics[0])),
 		server(NULL),
-		started(false)
+		started(false),
+		out(NULL)
 		{
 			characteristics[0] = &led_status_char;
 		}
@@ -67,6 +70,28 @@ public:
 
 	}
 
+	void bind(mbed::DigitalOut* output) {
+		out = output;
+	}
+
+	bool get_led_status() const {
+		uint16_t len = sizeof(led_status);
+		server->read(led_status_char.getValueHandle(), (uint8_t*) &led_status, &len);
+		if(out != NULL) {
+			out->write(led_status);
+		}
+		return led_status;
+	}
+
+	void set_led_status(bool led_status) {
+		this->led_status = led_status;
+		server->write(led_status_char.getValueHandle(), (uint8_t*) &this->led_status,
+				sizeof(this->led_status));
+		if(out != NULL) {
+			out->write(led_status);
+		}
+	}
+
 protected:
 
 	/** Descriptors (and their pointers...) */
@@ -88,6 +113,8 @@ protected:
 	GattServer* server;
 
 	bool started;
+
+	mbed::DigitalOut* out;
 
 };
 

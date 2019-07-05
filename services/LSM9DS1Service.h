@@ -86,6 +86,42 @@ public:
 
 	}
 
+	const tri_axis_reading_t& get_accel_reading() const {
+		uint16_t len = sizeof(accel_reading);
+		server->read(accel_char.getValueHandle(), (uint8_t*) &accel_reading, &len);
+		return accel_reading;
+	}
+
+	void set_accel_reading(const tri_axis_reading_t& accel_reading) {
+		this->accel_reading = accel_reading;
+		server->write(accel_char.getValueHandle(), (uint8_t*) &this->accel_reading,
+				sizeof(this->accel_reading));
+	}
+
+	const tri_axis_reading_t& get_gyro_reading() const {
+		uint16_t len = sizeof(gyro_reading);
+		server->read(gyro_char.getValueHandle(), (uint8_t*) &gyro_reading, &len);
+		return gyro_reading;
+	}
+
+	void set_gyro_reading(const tri_axis_reading_t& gyro_reading) {
+		this->gyro_reading = gyro_reading;
+		server->write(gyro_char.getValueHandle(), (uint8_t*) &this->gyro_reading,
+				sizeof(this->gyro_reading));
+	}
+
+	const tri_axis_reading_t& get_mag_reading() const {
+		uint16_t len = sizeof(mag_reading);
+		server->read(mag_char.getValueHandle(), (uint8_t*) &mag_reading, &len);
+		return mag_reading;
+	}
+
+	void set_mag_reading(const tri_axis_reading_t& mag_reading) {
+		this->mag_reading = mag_reading;
+		server->write(mag_char.getValueHandle(), (uint8_t*) &this->mag_reading,
+				sizeof(this->mag_reading));
+	}
+
 protected:
 
 	/** Descriptors (and their pointers...) */

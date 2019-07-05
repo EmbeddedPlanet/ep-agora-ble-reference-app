@@ -68,6 +68,18 @@ public:
 
 	}
 
+	uint16_t get_distance() const {
+		uint16_t len = sizeof(distance);
+		server->read(distance_char.getValueHandle(), (uint8_t*) &distance, &len);
+		return distance;
+	}
+
+	void set_distance(uint16_t distance) {
+		this->distance = distance;
+		server->write(distance_char.getValueHandle(), (uint8_t*) &this->distance,
+				sizeof(this->distance));
+	}
+
 protected:
 
 	/** Descriptors (and their pointers...) */
