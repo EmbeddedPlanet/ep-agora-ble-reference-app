@@ -40,7 +40,7 @@
  * Setup advertising payload and manage advertising state.
  * Delegate to GattClientProcess once the connection is established.
  */
-class BLEProcess : private mbed::NonCopyable<BLEProcess> {
+class BLEProcess : private mbed::NonCopyable<BLEProcess>, public ble::Gap::EventHandler {
 public:
     /**
      * Construct a BLEProcess from an event queue and a ble interface.
@@ -54,7 +54,7 @@ public:
 		{
     }
 
-    ~BLEProcess()
+    virtual ~BLEProcess()
     {
         stop();
     }
@@ -81,6 +81,8 @@ public:
             printf("Error: the ble instance has already been initialized.\r\n");
             return false;
         }
+
+        _ble_interface.gap().setEventHandler(this);
 
         _ble_interface.onEventsToProcess(
             makeFunctionPointer(this, &BLEProcess::schedule_ble_events)
@@ -237,6 +239,7 @@ private:
 
 
         return true;
+
     }
 
     events::EventQueue &_event_queue;

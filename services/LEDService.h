@@ -64,6 +64,8 @@ public:
 			return;
 		}
 
+		server->onDataWritten().add(this, &LEDService::on_data_written);
+
 		debug("LED service registered\r\n");
 		debug("service handle: %u\r\n", led_service.getHandle());
 		started = true;
@@ -89,6 +91,17 @@ public:
 				sizeof(this->led_status));
 		if(out != NULL) {
 			out->write(led_status);
+		}
+	}
+
+	/**
+	 * Handler for when a characteristic in this service gets written to
+	 */
+	void on_data_written(const GattWriteCallbackParams* params) {
+		if((params->handle == led_status_char.getValueHandle()) && params->len == 1) {
+			if(out != NULL) {
+				out->write(*params->data);
+			}
 		}
 	}
 
