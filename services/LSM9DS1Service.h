@@ -43,7 +43,7 @@ public:
 		gyro_desc(GattCharacteristic::BLE_GATT_FORMAT_STRUCT,
 				GattCharacteristic::BLE_GATT_UNIT_ANGULAR_VELOCITY_RADIAN_PER_SECOND), gyro_desc_ptr(&gyro_desc),
 		mag_desc(GattCharacteristic::BLE_GATT_FORMAT_STRUCT,
-				GattCharacteristic::BLE_GATT_UNIT_MAGNETIC_FLEX_DENSITY_TESLA), mag_desc_ptr(&mag_desc),
+				GattCharacteristic::BLE_GATT_UNIT_MAGNETIC_FLUX_DENSITY_TESLA), mag_desc_ptr(&mag_desc),
 		accel_char(LSM9DS1_ACCEL_XYZ_CHAR_UUID, &accel_reading, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NONE,
 				(GattAttribute**)(&accel_desc_ptr), 1),
 		gyro_char(LSM9DS1_GYRO_XYZ_CHAR_UUID, &gyro_reading, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NONE,

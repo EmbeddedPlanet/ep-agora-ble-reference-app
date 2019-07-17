@@ -74,7 +74,7 @@ public:
 
 	void set_rel_humidity(uint16_t rel_humidity) {
 		this->rel_humidity = rel_humidity;
-		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &rel_humidity, sizeof(rel_humidity));
+		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &this->rel_humidity, sizeof(this->rel_humidity));
 	}
 
 	int16_t get_temp_c() const {
@@ -85,8 +85,8 @@ public:
 
 	void set_temp_c(int16_t temp_c) {
 		this->temp_c = temp_c;
-		server->write(rel_humidity_char.getValueHandle(), (uint8_t*) &this->rel_humidity,
-				sizeof(this->rel_humidity));
+		server->write(temp_c_char.getValueHandle(), (uint8_t*) &this->temp_c,
+				sizeof(this->temp_c));
 	}
 
 protected:

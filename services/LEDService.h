@@ -29,7 +29,7 @@ class LEDService {
 
 public:
 
-	LEDService() :
+	LEDService(bool active_low = false) :
 		led_status_desc(GattCharacteristic::BLE_GATT_FORMAT_BOOLEAN), led_status_desc_ptr(&led_status_desc),
 		led_status_char(LED_STATUS_CHAR_UUID, &led_status,
 				GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_INDICATE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY,
@@ -42,7 +42,8 @@ public:
 									sizeof(characteristics[0])),
 		server(NULL),
 		started(false),
-		out(NULL)
+		out(NULL),
+		active_low(active_low)
 		{
 			characteristics[0] = &led_status_char;
 		}
@@ -79,9 +80,6 @@ public:
 	bool get_led_status() const {
 		uint16_t len = sizeof(led_status);
 		server->read(led_status_char.getValueHandle(), (uint8_t*) &led_status, &len);
-		if(out != NULL) {
-			out->write(led_status);
-		}
 		return led_status;
 	}
 
@@ -90,7 +88,7 @@ public:
 		server->write(led_status_char.getValueHandle(), (uint8_t*) &this->led_status,
 				sizeof(this->led_status));
 		if(out != NULL) {
-			out->write(led_status);
+			out->write((this->active_low? !led_status : led_status));
 		}
 	}
 
@@ -100,7 +98,7 @@ public:
 	void on_data_written(const GattWriteCallbackParams* params) {
 		if((params->handle == led_status_char.getValueHandle()) && params->len == 1) {
 			if(out != NULL) {
-				out->write(*params->data);
+				out->write((this->active_low? !(*params->data) : (*params->data)));
 			}
 		}
 	}
@@ -128,6 +126,8 @@ protected:
 	bool started;
 
 	mbed::DigitalOut* out;
+
+	bool active_low;
 
 };
 

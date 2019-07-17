@@ -9,6 +9,7 @@
 #include "platform/Callback.h"
 #include "platform/NonCopyable.h"
 #include "platform/mbed_wait_api.h"
+#include "rtos/Thread.h"
 #include "events/EventQueue.h"
 
 #include "ble/BLE.h"
@@ -34,6 +35,8 @@
 
 #define POLL_INTERVAL_MS 5000 // Sensor polling interval in milliseconds
 
+#define MAX_VBAT_VOLTAGE 3.3f
+
 /** Device Information Strings */
 const char manufacturers_name[]	= "Embedded Planet";
 const char model_number[]		= "Agora BLE";
@@ -52,7 +55,7 @@ ICM20602Service icm20602_service;
 LSM9DS1Service lsm9ds1_service;
 MAX44009Service max44009_service;
 VL53L0XService vl53l0x_service;
-LEDService led_service;
+LEDService led_service(true);
 BatteryVoltageService battery_voltage_service;
 
 void start_services(BLE& ble) {
@@ -89,7 +92,8 @@ void init_sensors(void) {
 
 	printf("Initializing sensors...\n");
 	printf("\t BME680: ");
-	if(bme680.begin()) {
+
+	if(bme680->init(&sensor_i2c)) {
 		printf("OK\n");
 	} else {
 		printf("FAILED\n");
@@ -99,7 +103,7 @@ void init_sensors(void) {
 	printf("\t MAX44009: OK\n");
 
 	printf("\t Si7021: ");
-	if(si7021.check() == 0) {
+	if(si7021.check() == 1) {
 		printf("OK\n");
 	} else {
 		printf("FAILED\n");
@@ -135,8 +139,86 @@ void init_sensors(void) {
 void poll_sensors(void) {
 	printf("Polling sensors...\n");
 
+	/** Poll BME680 */
+	// TODO - check if new data?
+	float temperature 	= bme680->get_temperature();
+	float pressure		= bme680->get_pressure();
+	float humidity		= bme680->get_humidity();
+	float gas_res		= bme680->get_gas_resistance();
+	float co2_eq		= bme680->get_co2_equivalent();
+	float breath_voc_eq	= bme680->get_breath_voc_equivalent();
+	float iaq_score		= bme680->get_iaq_score();
+	uint8_t iaq_acc		= bme680->get_iaq_accuracy();
+	printf("BME680:\n");
+	printf("\ttemperature: %.2f\n", temperature);
+	printf("\tpressure: %.2f\n", pressure);
+	printf("\thumidity: %.2f\n", humidity);
+	printf("\tgas resistance: %.2f\n", gas_res);
+	printf("\tco2 equivalent: %.2f\n", co2_eq);
+	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
+	printf("\tiaq score: %.2f\n", iaq_score);
+	printf("\tiaq accuracy: %i\n", iaq_acc);
+	temperature *= 10;	/** Scale up before converting to integer (preserves decimal component) */
+	pressure *= 10;		/** Scale up before converting to integer (preserves decimal component) */
+	humidity *= 10;		/** Scale up before converting to integer (preserves decimal component) */
+	bme680_service.set_temp_c((int16_t) temperature);
+	bme680_service.set_pressure((uint32_t) pressure);
+	bme680_service.set_rel_humidity((uint16_t) humidity);
+	bme680_service.set_gas_resistance((uint32_t) gas_res);
+	bme680_service.set_estimated_co2(co2_eq);
+	bme680_service.set_estimated_b_voc(breath_voc_eq);
+	bme680_service.set_iaq_score((uint16_t) iaq_score);
+	bme680_service.set_iaq_accuracy(iaq_acc);
+
+	/** Poll MAX44009 */
+	float als = (float) max44009.getLUXReading();
+	printf("MAX44009:\n");
+	printf("\tambient light reading: %.2f\n", als);
+	max44009_service.set_als_reading(als);
+
+	/** Poll Si7021 */
+	si7021.measure();
+	uint32_t humidity_si = si7021.get_humidity();
+	uint32_t temp_si	 = si7021.get_temperature();
+	humidity_si /= 100; // Divide by 100 to scale to 0.1 increments as specified by BLE
+	temp_si /= 100;
+	si7021_service.set_rel_humidity((uint16_t) humidity_si);
+	si7021_service.set_temp_c((int16_t) temp_si);
+	printf("Si7021:\n");
+	printf("\ttemperature: %lu\n", temp_si);
+	printf("\thumidity: %lu\n", humidity_si);
+
+	/** Poll VL53L0X */
+	uint32_t distance = 0;
+	vl53l0x.get_distance(&distance);
+	vl53l0x_service.set_distance((uint16_t) distance);
+	printf("VL53L0X:\n");
+	printf("\tdistance: %lu\n", distance);
+
+	/** Poll LSM9DS1 */
+
+	/** Poll ICM20602 */
+
+	/** Check battery voltage */
+	battery_mon_en = 1;
+	wait_ms(10);
+	float vbat = battery_voltage_in.read() * MAX_VBAT_VOLTAGE * 2.0f;
+	printf("Battery Voltage:\n");
+	printf("\tVbat: %.2f V\n", vbat);
+	battery_voltage_service.set_voltage(vbat);
+	battery_mon_en = 0;
+
+	printf("\n");
 }
 
+void sensor_poll_main(void) {
+
+	while(true) {
+		rtos::ThisThread::sleep_for(POLL_INTERVAL_MS);
+		poll_sensors();
+	}
+
+}
 
 int main() {
     BLE &ble_interface = BLE::Instance();
@@ -152,7 +234,10 @@ int main() {
     // and start advertising
     ble_process.start();
 
-    event_queue.call_every(POLL_INTERVAL_MS, mbed::callback(poll_sensors));
+    // Spin off the sensor polling thread
+    // need this to be separate from BLE processing since BLE requires higher priority processing
+    rtos::Thread sensor_thread(osPriorityBelowNormal);
+    sensor_thread.start(mbed::callback(sensor_poll_main));
 
     // Process the event queue.
     event_queue.dispatch_forever();
