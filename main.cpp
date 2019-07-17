@@ -118,6 +118,7 @@ void init_sensors(void) {
 
 	printf("\t LSM9DS1: ");
 	if(lsm9ds1.begin() != 0) {
+		lsm9ds1.calibrate();
 		printf("OK\n");
 	} else {
 		printf("FAILED\n");
@@ -196,6 +197,28 @@ void poll_sensors(void) {
 	printf("\tdistance: %lu\n", distance);
 
 	/** Poll LSM9DS1 */
+	LSM9DS1Service::tri_axis_reading_t reading;
+	lsm9ds1.readAccel();
+	reading.x = lsm9ds1.calcAccel(lsm9ds1.ax);
+	reading.y = lsm9ds1.calcAccel(lsm9ds1.ay);
+	reading.z = lsm9ds1.calcAccel(lsm9ds1.az);
+	printf("LSM9DS1:\n");
+	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+	lsm9ds1_service.set_accel_reading(reading);
+
+	lsm9ds1.readGyro();
+	reading.x = lsm9ds1.calcGyro(lsm9ds1.gx);
+	reading.y = lsm9ds1.calcGyro(lsm9ds1.gy);
+	reading.z = lsm9ds1.calcGyro(lsm9ds1.gz);
+	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+	lsm9ds1_service.set_gyro_reading(reading);
+
+	lsm9ds1.readMag();
+	reading.x = lsm9ds1.calcMag(lsm9ds1.mx);
+	reading.y = lsm9ds1.calcMag(lsm9ds1.my);
+	reading.z = lsm9ds1.calcMag(lsm9ds1.mz);
+	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+	lsm9ds1_service.set_mag_reading(reading);
 
 	/** Poll ICM20602 */
 

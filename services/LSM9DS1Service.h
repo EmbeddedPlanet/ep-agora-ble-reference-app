@@ -27,12 +27,12 @@
 
 class LSM9DS1Service {
 
-private:
+public:
 
 	 typedef MBED_PACKED(struct) tri_axis_reading {
-		int16_t x;
-		int16_t y;
-		int16_t z;
+		float x;
+		float y;
+		float z;
 	} tri_axis_reading_t;
 
 public:
