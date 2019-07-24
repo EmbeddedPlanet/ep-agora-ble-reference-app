@@ -41,9 +41,9 @@
 const char manufacturers_name[]	= "Embedded Planet";
 const char model_number[]		= "Agora BLE";
 const char serial_number[]		= "123456789";
-const char hardware_revision[]	= "1.0";
+const char hardware_revision[]	= "1.1";
 const char firmware_revision[]	= " ";
-const char software_revision[]	= "1.0.0";
+const char software_revision[]	= "0.0.5";
 
 /** Standard Services */
 DeviceInformationService* device_info_service;
