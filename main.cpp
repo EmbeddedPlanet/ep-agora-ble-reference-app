@@ -45,6 +45,9 @@ const char hardware_revision[]	= "1.1";
 const char firmware_revision[]	= " ";
 const char software_revision[]	= "0.0.5";
 
+/** BLE Process */
+BLEProcess* ble_process;
+
 /** Standard Services */
 DeviceInformationService* device_info_service;
 
@@ -57,6 +60,12 @@ MAX44009Service max44009_service;
 VL53L0XService vl53l0x_service;
 LEDService led_service(true);
 BatteryVoltageService battery_voltage_service;
+
+/** Event Queue */
+events::EventQueue event_queue;
+
+/** Pairing file location */
+static const char pairing_file_name[] = "fs/sm.dat";
 
 void start_services(BLE& ble) {
 
@@ -241,6 +250,21 @@ void poll_sensors(void) {
 	printf("\n");
 }
 
+void start_advertising(void) {
+	printf("ble: pairing button pressed\n");
+	if(ble_process->is_connected()) {
+		ble_process->disconnect();
+		// Disconnect handler will start advertising
+	}
+}
+
+/** Push button long press handler */
+void pb_long_press_handler(ep::ButtonIn* btn) {
+	(void) btn; // Ignore argument
+	// Disconnect and start advertising procedure -- defer to thread context
+	event_queue.call(mbed::callback(start_advertising));
+}
+
 void sensor_poll_main(void) {
 
 	while(true) {
@@ -252,22 +276,29 @@ void sensor_poll_main(void) {
 
 int main() {
     BLE &ble_interface = BLE::Instance();
-    events::EventQueue event_queue;
 
     init_sensors();
 
-    BLEProcess ble_process(event_queue, ble_interface);
+    BLEProcess main_ble_process(event_queue, ble_interface);
+    ble_process = &main_ble_process;
 
-    ble_process.on_init(mbed::callback(start_services));
+    ble_process->on_init(mbed::callback(start_services));
 
     // bind the event queue to the ble interface, initialize the interface
     // and start advertising
-    ble_process.start();
+    ble_process->start(pairing_file_name);
+
+    // Attach a long press callback to the backside reset button -- starts repairing
+    push_button_in.attach_long_press_callback(mbed::callback(pb_long_press_handler));
 
     // Spin off the sensor polling thread
     // need this to be separate from BLE processing since BLE requires higher priority processing
-    rtos::Thread sensor_thread(osPriorityBelowNormal);
-    sensor_thread.start(mbed::callback(sensor_poll_main));
+//    rtos::Thread sensor_thread(osPriorityBelowNormal);
+//    sensor_thread.start(mbed::callback(sensor_poll_main));
+
+    while(true)  {
+    	event_queue.dispatch();
+    }
 
     // Process the event queue.
     event_queue.dispatch_forever();

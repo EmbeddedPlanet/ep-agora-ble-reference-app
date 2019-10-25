@@ -17,6 +17,8 @@ mbed::DigitalOut board_led(LED1, 1);
 mbed::AnalogIn battery_voltage_in(PIN_NAME_BATTERY);
 mbed::AnalogIn board_id_in(PIN_NAME_BOARD_ID);
 
+ep::DigitalButton push_button_in(PIN_NAME_PUSH_BUTTON, true);
+
 /** Sensors */
 BME680_BSEC* bme680 = BME680_BSEC::get_instance();
 MAX44009 max44009(sensor_i2c, MAX44009_I2C_ADDR);
