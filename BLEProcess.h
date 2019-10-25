@@ -89,8 +89,8 @@ public:
             printf("Error: the ble instance has already been initialized.\r\n");
             return false;
         }
-//
-//        ble_interface.gap().setEventHandler(this);
+
+        ble_interface.gap().setEventHandler(this);
 
         ble_interface.onEventsToProcess(
             makeFunctionPointer(this, &BLEProcess::schedule_ble_events)
@@ -115,8 +115,13 @@ public:
      */
     void disconnect(void) {
     	if(connected) {
-    		ble_interface.gap().disconnect(connection_handle,
-    				ble::local_disconnection_reason_t::USER_TERMINATION);
+    		ble_error_t error = ble_interface.gap().disconnect(connection_handle,
+    				ble::local_disconnection_reason_t(ble::local_disconnection_reason_t::USER_TERMINATION));
+    		if(error) {
+    			printf("ble: error when disconnecting - 0x%X\n", error);
+    		} else {
+    			printf("ble: disconnecting from central...\n");
+    		}
     	}
     }
 
@@ -158,9 +163,6 @@ private:
         }
         printf("Ble instance initialized\r\n");
 
-        Gap &gap = ble_interface.gap();
-        gap.onConnection(this, &BLEProcess::when_connection);
-        gap.onDisconnection(this, &BLEProcess::when_disconnection);
 
 //        printf("ble: initializing the security manager\n");
 //
@@ -203,22 +205,14 @@ private:
     /** Override Gap event handler */
     void onConnectionComplete(const ble::ConnectionCompleteEvent &event)
     {
+    	connection_handle = event.getConnectionHandle();
+        connected = true;
         printf("Connected.\r\n");
     }
 
     void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
     {
-        printf("Disconnected.\r\n");
-        start_advertising();
-    }
-
-    void when_connection(const Gap::ConnectionCallbackParams_t *connection_event)
-    {
-        printf("Connected.\r\n");
-    }
-
-    void when_disconnection(const Gap::DisconnectionCallbackParams_t *event)
-    {
+    	connected = false;
         printf("Disconnected.\r\n");
         start_advertising();
     }

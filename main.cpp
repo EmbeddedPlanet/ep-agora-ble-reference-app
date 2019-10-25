@@ -293,8 +293,8 @@ int main() {
 
     // Spin off the sensor polling thread
     // need this to be separate from BLE processing since BLE requires higher priority processing
-//    rtos::Thread sensor_thread(osPriorityBelowNormal);
-//    sensor_thread.start(mbed::callback(sensor_poll_main));
+    rtos::Thread sensor_thread(osPriorityBelowNormal);
+    sensor_thread.start(mbed::callback(sensor_poll_main));
 
     while(true)  {
     	event_queue.dispatch();
