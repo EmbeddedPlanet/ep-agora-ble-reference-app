@@ -6,12 +6,16 @@
 
 #include <stdio.h>
 
+/** Mbed */
 #include "platform/Callback.h"
 #include "platform/NonCopyable.h"
 #include "platform/mbed_wait_api.h"
 #include "rtos/Thread.h"
 #include "events/EventQueue.h"
+#include "LittleFileSystem.h"
+#include "BlockDevice.h"
 
+/** BLE */
 #include "ble/BLE.h"
 #include "ble/Gap.h"
 #include "ble/GattClient.h"
@@ -159,15 +163,15 @@ void poll_sensors(void) {
 	float breath_voc_eq	= bme680->get_breath_voc_equivalent();
 	float iaq_score		= bme680->get_iaq_score();
 	uint8_t iaq_acc		= bme680->get_iaq_accuracy();
-	printf("BME680:\n");
-	printf("\ttemperature: %.2f\n", temperature);
-	printf("\tpressure: %.2f\n", pressure);
-	printf("\thumidity: %.2f\n", humidity);
-	printf("\tgas resistance: %.2f\n", gas_res);
-	printf("\tco2 equivalent: %.2f\n", co2_eq);
-	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
-	printf("\tiaq score: %.2f\n", iaq_score);
-	printf("\tiaq accuracy: %i\n", iaq_acc);
+//	printf("BME680:\n");
+//	printf("\ttemperature: %.2f\n", temperature);
+//	printf("\tpressure: %.2f\n", pressure);
+//	printf("\thumidity: %.2f\n", humidity);
+//	printf("\tgas resistance: %.2f\n", gas_res);
+//	printf("\tco2 equivalent: %.2f\n", co2_eq);
+//	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
+//	printf("\tiaq score: %.2f\n", iaq_score);
+//	printf("\tiaq accuracy: %i\n", iaq_acc);
 	temperature *= 100;	/** Scale up before converting to integer (preserves decimal component) */
 	pressure *= 10;		/** Scale up before converting to integer (preserves decimal component) */
 	humidity *= 100;		/** Scale up before converting to integer (preserves decimal component) */
@@ -182,8 +186,8 @@ void poll_sensors(void) {
 
 	/** Poll MAX44009 */
 	float als = (float) max44009.getLUXReading();
-	printf("MAX44009:\n");
-	printf("\tambient light reading: %.2f\n", als);
+//	printf("MAX44009:\n");
+//	printf("\tambient light reading: %.2f\n", als);
 	max44009_service.set_als_reading(als);
 
 	/** Poll Si7021 */
@@ -194,9 +198,9 @@ void poll_sensors(void) {
 	temp_si /= 10;
 	si7021_service.set_rel_humidity((uint16_t) humidity_si);
 	si7021_service.set_temp_c((int16_t) temp_si);
-	printf("Si7021:\n");
-	printf("\ttemperature: %lu\n", temp_si);
-	printf("\thumidity: %lu\n", humidity_si);
+//	printf("Si7021:\n");
+//	printf("\ttemperature: %lu\n", temp_si);
+//	printf("\thumidity: %lu\n", humidity_si);
 
 	/** Poll VL53L0X */
 	uint32_t distance = 0;
@@ -207,8 +211,8 @@ void poll_sensors(void) {
 		distance = 0xFFFF;
 	}
 	vl53l0x_service.set_distance((uint16_t) distance);
-	printf("VL53L0X:\n");
-	printf("\tdistance: %lu\n", distance);
+//	printf("VL53L0X:\n");
+//	printf("\tdistance: %lu\n", distance);
 
 	/** Poll LSM9DS1 */
 	LSM9DS1Service::tri_axis_reading_t reading;
@@ -216,22 +220,22 @@ void poll_sensors(void) {
 	reading.x = lsm9ds1.calcAccel(lsm9ds1.ax);
 	reading.y = lsm9ds1.calcAccel(lsm9ds1.ay);
 	reading.z = lsm9ds1.calcAccel(lsm9ds1.az);
-	printf("LSM9DS1:\n");
-	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+//	printf("LSM9DS1:\n");
+//	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	lsm9ds1_service.set_accel_reading(reading);
 
 	lsm9ds1.readGyro();
 	reading.x = lsm9ds1.calcGyro(lsm9ds1.gx);
 	reading.y = lsm9ds1.calcGyro(lsm9ds1.gy);
 	reading.z = lsm9ds1.calcGyro(lsm9ds1.gz);
-	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+//	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	lsm9ds1_service.set_gyro_reading(reading);
 
 	lsm9ds1.readMag();
 	reading.x = lsm9ds1.calcMag(lsm9ds1.mx);
 	reading.y = lsm9ds1.calcMag(lsm9ds1.my);
 	reading.z = lsm9ds1.calcMag(lsm9ds1.mz);
-	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+//	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	lsm9ds1_service.set_mag_reading(reading);
 
 	/** Poll ICM20602 */
@@ -242,12 +246,12 @@ void poll_sensors(void) {
 	battery_mon_en = 1;
 	wait_ms(10);
 	float vbat = battery_voltage_in.read() * MAX_VBAT_VOLTAGE * 2.0f;
-	printf("Battery Voltage:\n");
-	printf("\tVbat: %.2f V\n", vbat);
+//	printf("Battery Voltage:\n");
+//	printf("\tVbat: %.2f V\n", vbat);
 	battery_voltage_service.set_voltage(vbat);
 	battery_mon_en = 0;
 
-	printf("\n");
+//	printf("\n");
 }
 
 void start_advertising(void) {
@@ -274,8 +278,49 @@ void sensor_poll_main(void) {
 
 }
 
+bool create_filesystem()
+{
+
+	printf("filesystem - initializing...\n");
+    static LittleFileSystem fs("fs");
+
+    /* replace this with any physical block device your board supports (like an SD card) */
+    static BlockDevice& bd = *BlockDevice::get_default_instance();
+
+    int err = bd.init();
+
+    if (err) {
+        return false;
+    }
+
+    err = fs.mount(&bd);
+
+    if (err) {
+        /* Reformat if we can't mount the filesystem */
+        printf("filesystem: no filesystem found, formatting...\r\n");
+
+        err = fs.reformat(&bd);
+
+        if (err) {
+            return false;
+        }
+    }
+
+
+    return true;
+}
+
 int main() {
+	printf("agora: BLE application begin\n");
     BLE &ble_interface = BLE::Instance();
+
+    /* if filesystem creation fails or there is no filesystem the security manager
+     * will fallback to storing the security database in memory */
+    if (!create_filesystem()) {
+        printf("filesystem: creation failed!\n");
+    } else {
+    	printf("filesystem: creation succeeded!\n");
+    }
 
     init_sensors();
 
