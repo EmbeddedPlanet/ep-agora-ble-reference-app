@@ -13,6 +13,7 @@
 #include "rtos/Thread.h"
 #include "events/EventQueue.h"
 #include "LittleFileSystem.h"
+#include "FATFileSystem.h"
 #include "BlockDevice.h"
 
 /** BLE */
@@ -36,6 +37,9 @@
 #include "BatteryVoltageService.h"
 
 #include "agora_components.h"
+
+// Prints extra sensor polling information
+#define DEBUG_SENSOR_POLLING 0
 
 #define POLL_INTERVAL_MS 5000 // Sensor polling interval in milliseconds
 
@@ -69,7 +73,7 @@ BatteryVoltageService battery_voltage_service;
 events::EventQueue event_queue;
 
 /** Pairing file location */
-static const char pairing_file_name[] = "fs/sm.dat";
+static const char pairing_file_name[] = "/fs/sm.dat";
 
 void start_services(BLE& ble) {
 
@@ -103,46 +107,46 @@ void init_sensors(void) {
 
 	wait_ms(100);
 
-	printf("Initializing sensors...\n");
+	printf("Initializing sensors...\r\n");
 	printf("\t BME680: ");
 
 	if(bme680->init(&sensor_i2c)) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	// No way to check this really...
-	printf("\t MAX44009: OK\n");
+	printf("\t MAX44009: OK\r\n");
 
 	printf("\t Si7021: ");
 	if(si7021.check() == 1) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t VL53L0X: ");
 	if(vl53l0x.init_sensor(DEFAULT_DEVICE_ADDRESS) == 0) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t LSM9DS1: ");
 	if(lsm9ds1.begin() != 0) {
 		lsm9ds1.calibrate();
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t ICM20602: ");
 	icm20602.init();
 	if(icm20602.isOnline()) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	// Attach LED to BLE service
@@ -151,10 +155,11 @@ void init_sensors(void) {
 }
 
 void poll_sensors(void) {
+#if DEBUG_SENSOR_POLLING
 	printf("Polling sensors...\n");
+#endif
 
 	/** Poll BME680 */
-	// TODO - check if new data?
 	float temperature 	= bme680->get_temperature();
 	float pressure		= bme680->get_pressure();
 	float humidity		= bme680->get_humidity();
@@ -163,15 +168,19 @@ void poll_sensors(void) {
 	float breath_voc_eq	= bme680->get_breath_voc_equivalent();
 	float iaq_score		= bme680->get_iaq_score();
 	uint8_t iaq_acc		= bme680->get_iaq_accuracy();
-//	printf("BME680:\n");
-//	printf("\ttemperature: %.2f\n", temperature);
-//	printf("\tpressure: %.2f\n", pressure);
-//	printf("\thumidity: %.2f\n", humidity);
-//	printf("\tgas resistance: %.2f\n", gas_res);
-//	printf("\tco2 equivalent: %.2f\n", co2_eq);
-//	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
-//	printf("\tiaq score: %.2f\n", iaq_score);
-//	printf("\tiaq accuracy: %i\n", iaq_acc);
+
+#if DEBUG_SENSOR_POLLING
+	printf("BME680:\n");
+	printf("\ttemperature: %.2f\n", temperature);
+	printf("\tpressure: %.2f\n", pressure);
+	printf("\thumidity: %.2f\n", humidity);
+	printf("\tgas resistance: %.2f\n", gas_res);
+	printf("\tco2 equivalent: %.2f\n", co2_eq);
+	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
+	printf("\tiaq score: %.2f\n", iaq_score);
+	printf("\tiaq accuracy: %i\n", iaq_acc);
+#endif
+
 	temperature *= 100;	/** Scale up before converting to integer (preserves decimal component) */
 	pressure *= 10;		/** Scale up before converting to integer (preserves decimal component) */
 	humidity *= 100;		/** Scale up before converting to integer (preserves decimal component) */
@@ -186,8 +195,12 @@ void poll_sensors(void) {
 
 	/** Poll MAX44009 */
 	float als = (float) max44009.getLUXReading();
-//	printf("MAX44009:\n");
-//	printf("\tambient light reading: %.2f\n", als);
+
+#if DEBUG_SENSOR_POLLING
+	printf("MAX44009:\n");
+	printf("\tambient light reading: %.2f\n", als);
+#endif
+
 	max44009_service.set_als_reading(als);
 
 	/** Poll Si7021 */
@@ -198,9 +211,12 @@ void poll_sensors(void) {
 	temp_si /= 10;
 	si7021_service.set_rel_humidity((uint16_t) humidity_si);
 	si7021_service.set_temp_c((int16_t) temp_si);
-//	printf("Si7021:\n");
-//	printf("\ttemperature: %lu\n", temp_si);
-//	printf("\thumidity: %lu\n", humidity_si);
+
+#if DEBUG_SENSOR_POLLING
+	printf("Si7021:\n");
+	printf("\ttemperature: %lu\n", temp_si);
+	printf("\thumidity: %lu\n", humidity_si);
+#endif
 
 	/** Poll VL53L0X */
 	uint32_t distance = 0;
@@ -211,8 +227,11 @@ void poll_sensors(void) {
 		distance = 0xFFFF;
 	}
 	vl53l0x_service.set_distance((uint16_t) distance);
-//	printf("VL53L0X:\n");
-//	printf("\tdistance: %lu\n", distance);
+
+#if DEBUG_SENSOR_POLLING
+	printf("VL53L0X:\n");
+	printf("\tdistance: %lu\n", distance);
+#endif
 
 	/** Poll LSM9DS1 */
 	LSM9DS1Service::tri_axis_reading_t reading;
@@ -220,25 +239,34 @@ void poll_sensors(void) {
 	reading.x = lsm9ds1.calcAccel(lsm9ds1.ax);
 	reading.y = lsm9ds1.calcAccel(lsm9ds1.ay);
 	reading.z = lsm9ds1.calcAccel(lsm9ds1.az);
-//	printf("LSM9DS1:\n");
-//	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+
+#if DEBUG_SENSOR_POLLING
+	printf("LSM9DS1:\n");
+	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+#endif
+
 	lsm9ds1_service.set_accel_reading(reading);
 
 	lsm9ds1.readGyro();
 	reading.x = lsm9ds1.calcGyro(lsm9ds1.gx);
 	reading.y = lsm9ds1.calcGyro(lsm9ds1.gy);
 	reading.z = lsm9ds1.calcGyro(lsm9ds1.gz);
-//	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	lsm9ds1_service.set_gyro_reading(reading);
 
 	lsm9ds1.readMag();
 	reading.x = lsm9ds1.calcMag(lsm9ds1.mx);
 	reading.y = lsm9ds1.calcMag(lsm9ds1.my);
 	reading.z = lsm9ds1.calcMag(lsm9ds1.mz);
-//	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+
+#if DEBUG_SENSOR_POLLING
+	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+#endif
+
 	lsm9ds1_service.set_mag_reading(reading);
 
 	/** Poll ICM20602 */
+	// TODO - support for ICM20602
 	//icm20602.getAccXvalue();
 
 
@@ -246,12 +274,19 @@ void poll_sensors(void) {
 	battery_mon_en = 1;
 	wait_ms(10);
 	float vbat = battery_voltage_in.read() * MAX_VBAT_VOLTAGE * 2.0f;
-//	printf("Battery Voltage:\n");
-//	printf("\tVbat: %.2f V\n", vbat);
+
+#if DEBUG_SENSOR_POLLING
+	printf("Battery Voltage:\n");
+	printf("\tVbat: %.2f V\n", vbat);
+#endif
+
 	battery_voltage_service.set_voltage(vbat);
 	battery_mon_en = 0;
 
-//	printf("\n");
+#if DEBUG_SENSOR_POLLING
+	printf("\n");
+#endif
+
 }
 
 void start_advertising(void) {
@@ -284,7 +319,7 @@ bool create_filesystem()
 	printf("filesystem - initializing...\n");
     static LittleFileSystem fs("fs");
 
-    /* replace this with any physical block device your board supports (like an SD card) */
+    /* Get the default system block device */
     static BlockDevice& bd = *BlockDevice::get_default_instance();
 
     int err = bd.init();
@@ -306,20 +341,62 @@ bool create_filesystem()
         }
     }
 
+    // Check if the security database file exists
+    FILE* db_file = fopen(pairing_file_name, "rb+");
+    if(db_file == NULL) {
+    	printf("filesystem: ble security file not found!\r\n");
+    } else {
+    	printf("filesystem: ble security file exists\r\n");
+    	if(fseek(db_file, 0, SEEK_SET)) {
+    		printf("filesystem: db seek failed\r\n");
+    	} else {
+    		printf("filesystem: db seek success\r\n");
+    	}
+    	uint16_t version = 0;
+    	size_t num_read = fread(&version, sizeof(version), 1, db_file);
+        printf("filesystem: numread - %d, db version - %d\r\n",
+        		num_read, version);
+    	fclose(db_file);
+    }
+
+    // Test read/write file
+    FILE* file = fopen("/fs/test.dat", "rb+");
+    if(file == NULL) {
+    	printf("filesystem: creating test file...\r\n");
+    	file = fopen("fs/test.dat", "wb+");
+    	fseek(file, 0, SEEK_SET);
+		uint16_t version = 1;
+		uint8_t test_string[] = "hello!";
+		size_t num_written = fwrite(&version, sizeof(version), 1, file);
+		printf("filesystem: writing version, num written: %d\r\n", num_written);
+		num_written = fwrite(test_string, sizeof(uint8_t), 6, file);
+		printf("filesystem: writing test string, num written: %d\r\n", num_written);
+    } else {
+    	printf("filesystem: reading test file...\r\n");
+    	fseek(file, 0, SEEK_SET);
+    	uint16_t version = 0;
+    	uint8_t test_string[10];
+    	size_t num_read = fread(&version, sizeof(version), 1, file);
+    	printf("filesystem: read %d bytes, version: %d\r\n", num_read, version);
+    	num_read = fread(&test_string, sizeof(uint8_t), 10, file);
+		printf("filesystem: read %d bytes, string: %s\r\n", num_read, test_string);
+    }
+
+    fclose(file);
 
     return true;
 }
 
 int main() {
-	printf("agora: BLE application begin\n");
+	printf("agora: BLE application begin\r\n");
     BLE &ble_interface = BLE::Instance();
 
     /* if filesystem creation fails or there is no filesystem the security manager
      * will fallback to storing the security database in memory */
     if (!create_filesystem()) {
-        printf("filesystem: creation failed!\n");
+        printf("filesystem: initialization failed!\r\n");
     } else {
-    	printf("filesystem: creation succeeded!\n");
+    	printf("filesystem: initialization succeeded!\r\n");
     }
 
     init_sensors();
@@ -340,10 +417,6 @@ int main() {
     // need this to be separate from BLE processing since BLE requires higher priority processing
     rtos::Thread sensor_thread(osPriorityBelowNormal);
     sensor_thread.start(mbed::callback(sensor_poll_main));
-
-    while(true)  {
-    	event_queue.dispatch();
-    }
 
     // Process the event queue.
     event_queue.dispatch_forever();
