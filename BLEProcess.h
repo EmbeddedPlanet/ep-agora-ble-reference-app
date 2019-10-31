@@ -126,6 +126,14 @@ public:
     }
 
     /**
+     * Purge bonding/pairing information
+     */
+    void purge_bonding_info(void) {
+    	BLE& ble = BLE::Instance();
+    	ble.securityManager().purgeAllBondingState();
+    }
+
+    /**
      * Close existing connections and stop the process.
      */
     void stop()
@@ -164,26 +172,52 @@ private:
         printf("Ble instance initialized\r\n");
 
 
-//        printf("ble: initializing the security manager\n");
-//
-//        // TODO - update these settings in the future
-//        ble_error_t error = event->ble.securityManager().init(
-//        		true,
-//				false,
-//				SecurityManager::IO_CAPS_NONE,
-//				NULL,
-//				false,
-//				sm_file_name
-//        		);
-//
-//
-//        if(error) {
-//        	printf("ble: error while initializing the security manager\n");
-//        }
-//
-//        event->ble.securityManager().preserveBondingStateOnReset(true);
-//        event->ble.securityManager().setSecurityManagerEventHandler(this);
-//        event->ble.securityManager().setPairingRequestAuthorisation(true); // Accept any pairing request
+        printf("ble: initializing the security manager\n");
+
+        ble_error_t error = event->ble.securityManager().init(
+        		true,
+				false,
+				SecurityManager::IO_CAPS_NONE,
+				NULL,
+				false,
+				sm_file_name
+        		);
+
+
+        if(error) {
+        	printf("ble: error while initializing the security manager\n");
+        }
+
+        event->ble.securityManager().setSecurityManagerEventHandler(this);
+        event->ble.securityManager().setPairingRequestAuthorisation(true);
+        event->ble.securityManager().allowLegacyPairing(true);
+        event->ble.securityManager().setHintFutureRoleReversal(true);
+
+        error = event->ble.securityManager().preserveBondingStateOnReset(true);
+        if(error) {
+        	printf("ble: error during preserveBondingStateOnReset - 0x%X\n", error);
+        }
+
+
+        /* Enable privacy */
+        error = event->ble.gap().enablePrivacy(true);
+        if(error) {
+        	printf("ble: error enabling privacy \n");
+        }
+
+        Gap::PeripheralPrivacyConfiguration_t config = {
+        		/* use_non_resolvable_random_address */ false,
+				Gap::PeripheralPrivacyConfiguration_t::PERFORM_PAIRING_PROCEDURE
+        };
+        event->ble.gap().setPeripheralPrivacyConfiguration(&config);
+
+
+
+        printf("ble: checking whitelist\n");
+        whitelist.addresses = this->whitelist_addrs;
+        whitelist.capacity = 5;
+        whitelist.size = 0;
+        event->ble.securityManager().generateWhitelistFromBondTable(&whitelist);
 
         if (!set_advertising_parameters()) {
             return;
@@ -212,9 +246,27 @@ private:
 
     void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
     {
+    	BLE& ble = BLE::Instance();
+    	ble.securityManager().reset();
     	connected = false;
         printf("Disconnected.\r\n");
         start_advertising();
+    }
+
+    void print_address(BLEProtocol::Address_t& addr) {
+    	for(int j = 0; j < 6; j++) { // 48-bit
+    		printf("%X", addr.address[j]);
+		}
+		printf("\n");
+    }
+
+    void whitelistFromBondTable(Gap::Whitelist_t* whitelist) {
+    	printf("ble: whitelist size - %d\n", whitelist->size);
+    	for(int i = 0; i < whitelist->size; i++) {
+    		printf("\taddress:");
+    		print_address(whitelist->addresses[i]);
+    		printf("\n");
+    	}
     }
 
     bool start_advertising(void)
@@ -308,6 +360,10 @@ private:
     	printf("ble: link %s\n",
     			(result == ble::link_encryption_t::ENCRYPTED? "ENCRYPTED" : "not encrypted!"));
 
+    	BLE& ble = BLE::Instance();
+    	printf("ble: checking whitelist\n");
+    	ble.securityManager().generateWhitelistFromBondTable(&whitelist);
+
 
     }
 
@@ -317,6 +373,8 @@ private:
     bool connected;
     mbed::Callback<void(BLE&)> post_init_cb;
     const char* sm_file_name;
+    BLEProtocol::Address_t whitelist_addrs[5];
+    Gap::Whitelist_t whitelist;
 
 };
 
