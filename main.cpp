@@ -159,9 +159,9 @@ void poll_sensors(void) {
 	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
 	printf("\tiaq score: %.2f\n", iaq_score);
 	printf("\tiaq accuracy: %i\n", iaq_acc);
-	temperature *= 10;	/** Scale up before converting to integer (preserves decimal component) */
+	temperature *= 100;	/** Scale up before converting to integer (preserves decimal component) */
 	pressure *= 10;		/** Scale up before converting to integer (preserves decimal component) */
-	humidity *= 10;		/** Scale up before converting to integer (preserves decimal component) */
+	humidity *= 100;		/** Scale up before converting to integer (preserves decimal component) */
 	bme680_service.set_temp_c((int16_t) temperature);
 	bme680_service.set_pressure((uint32_t) pressure);
 	bme680_service.set_rel_humidity((uint16_t) humidity);
@@ -181,8 +181,8 @@ void poll_sensors(void) {
 	si7021.measure();
 	uint32_t humidity_si = si7021.get_humidity();
 	uint32_t temp_si	 = si7021.get_temperature();
-	humidity_si /= 100; // Divide by 100 to scale to 0.1 increments as specified by BLE
-	temp_si /= 100;
+	humidity_si /= 10; // Divide by 10 to scale to 0.01 increments as specified by BLE
+	temp_si /= 10;
 	si7021_service.set_rel_humidity((uint16_t) humidity_si);
 	si7021_service.set_temp_c((int16_t) temp_si);
 	printf("Si7021:\n");
@@ -192,6 +192,11 @@ void poll_sensors(void) {
 	/** Poll VL53L0X */
 	uint32_t distance = 0;
 	vl53l0x.get_distance(&distance);
+	if(distance == 0) {
+		// 0 means the distance is too far
+		// Set to infinity
+		distance = 0xFFFF;
+	}
 	vl53l0x_service.set_distance((uint16_t) distance);
 	printf("VL53L0X:\n");
 	printf("\tdistance: %lu\n", distance);
@@ -221,6 +226,8 @@ void poll_sensors(void) {
 	lsm9ds1_service.set_mag_reading(reading);
 
 	/** Poll ICM20602 */
+	//icm20602.getAccXvalue();
+
 
 	/** Check battery voltage */
 	battery_mon_en = 1;
