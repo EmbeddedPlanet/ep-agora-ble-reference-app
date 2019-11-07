@@ -15,6 +15,7 @@
 #include "LittleFileSystem.h"
 #include "FATFileSystem.h"
 #include "BlockDevice.h"
+#include "HeapBlockDevice.h"
 
 /** BLE */
 #include "ble/BLE.h"
@@ -38,8 +39,13 @@
 
 #include "agora_components.h"
 
+#include "USBMSD.h"
+
 // Prints extra sensor polling information
 #define DEBUG_SENSOR_POLLING 0
+
+// Erases the block device during filesystem initialization
+#define ERASE_BLOCK_DEVICE 0
 
 #define POLL_INTERVAL_MS 5000 // Sensor polling interval in milliseconds
 
@@ -71,6 +77,9 @@ BatteryVoltageService battery_voltage_service;
 
 /** Event Queue */
 events::EventQueue event_queue;
+
+/** BlockDevice on which the filesystem is mounted */
+BlockDevice* fsbd;
 
 /** Pairing file location */
 static const char pairing_file_name[] = "/fs/sm.dat";
@@ -317,16 +326,32 @@ bool create_filesystem()
 {
 
 	printf("filesystem - initializing...\n");
-    static LittleFileSystem fs("fs");
 
     /* Get the default system block device */
-    static BlockDevice& bd = *BlockDevice::get_default_instance();
+
+	/** Slice it so we only use part of it for the filesystem */
+	static SlicingBlockDevice sbd(BlockDevice::get_default_instance(),
+			0, (64*1024));
+	fsbd = &sbd;
+    BlockDevice& bd = *fsbd;
 
     int err = bd.init();
 
     if (err) {
+    	printf("filesystem: failed to initialize block device\r\n");
         return false;
     }
+
+#if ERASE_BLOCK_DEVICE
+
+    err = bd.erase(0, bd.size());
+    if(err) {
+    	printf("filesystem: could not erase block device\r\n");
+    	return false;
+    }
+#endif
+
+    static LittleFileSystem fs("fs");
 
     err = fs.mount(&bd);
 
@@ -340,6 +365,38 @@ bool create_filesystem()
             return false;
         }
     }
+
+    err = fs.unmount();
+    if(err) {
+    	return false;
+    }
+
+    printf("usb: mounting msd...\r\n");
+    // Let the host dump it over USB
+    USBMSD usb(fsbd, false);
+    usb.connect(); // blocking connect...
+    printf("usb: connected\r\n");
+    int delay_counter = 0;
+    while(true) {
+		usb.process();
+
+		if(delay_counter >= 3000) {
+			if(!usb.configured()) {
+				usb.disconnect();
+				break;
+			}
+		} else {
+			delay_counter++;
+		}
+		wait_ms(1);
+    }
+    printf("usb: disconnected\r\n");
+
+    err = fs.mount(fsbd);
+    if(err) {
+    	return false;
+    }
+
 
     // Check if the security database file exists
     FILE* db_file = fopen(pairing_file_name, "rb+");
@@ -358,33 +415,56 @@ bool create_filesystem()
         		num_read, version);
     	fclose(db_file);
     }
-
-    // Test read/write file
-    FILE* file = fopen("/fs/test.dat", "rb+");
-    if(file == NULL) {
-    	printf("filesystem: creating test file...\r\n");
-    	file = fopen("fs/test.dat", "wb+");
-    	fseek(file, 0, SEEK_SET);
-		uint16_t version = 1;
-		uint8_t test_string[] = "hello!";
-		size_t num_written = fwrite(&version, sizeof(version), 1, file);
-		printf("filesystem: writing version, num written: %d\r\n", num_written);
-		num_written = fwrite(test_string, sizeof(uint8_t), 6, file);
-		printf("filesystem: writing test string, num written: %d\r\n", num_written);
-    } else {
-    	printf("filesystem: reading test file...\r\n");
-    	fseek(file, 0, SEEK_SET);
-    	uint16_t version = 0;
-    	uint8_t test_string[10];
-    	size_t num_read = fread(&version, sizeof(version), 1, file);
-    	printf("filesystem: read %d bytes, version: %d\r\n", num_read, version);
-    	num_read = fread(&test_string, sizeof(uint8_t), 10, file);
-		printf("filesystem: read %d bytes, string: %s\r\n", num_read, test_string);
-    }
-
-    fclose(file);
+//
+//    // Test read/write file
+//    FILE* file = fopen("/fs/test.dat", "rb+");
+//    if(file == NULL) {
+//    	printf("filesystem: creating test file...\r\n");
+//    	file = fopen("fs/test.dat", "wb+");
+//    	fseek(file, 0, SEEK_SET);
+//		uint16_t version = 1;
+//		uint8_t test_string[] = "hello!";
+//		size_t num_written = fwrite(&version, sizeof(version), 1, file);
+//		printf("filesystem: writing version, num written: %d\r\n", num_written);
+//		num_written = fwrite(test_string, sizeof(uint8_t), 6, file);
+//		printf("filesystem: writing test string, num written: %d\r\n", num_written);
+//    } else {
+//    	printf("filesystem: reading test file...\r\n");
+//    	fseek(file, 0, SEEK_SET);
+//    	uint16_t version = 0;
+//    	uint8_t test_string[10];
+//    	size_t num_read = fread(&version, sizeof(version), 1, file);
+//    	printf("filesystem: read %d bytes, version: %d\r\n", num_read, version);
+//    	num_read = fread(&test_string, sizeof(uint8_t), 10, file);
+//		printf("filesystem: read %d bytes, string: %s\r\n", num_read, test_string);
+//    }
+//
+//    fclose(file);
 
     return true;
+}
+
+void connect_usb(void) {
+    printf("usb: mounting msd...\r\n");
+    // Let the host dump it over USB
+    USBMSD usb(fsbd, false);
+    usb.connect(); // blocking connect...
+    printf("usb: connected\r\n");
+    int delay_counter = 0;
+    while(true) {
+		usb.process();
+
+		if(delay_counter >= 3000) {
+			if(!usb.configured()) {
+				usb.disconnect();
+				break;
+			}
+		} else {
+			delay_counter++;
+		}
+		wait_ms(1);
+    }
+    printf("usb: disconnected\r\n");
 }
 
 int main() {
@@ -417,6 +497,8 @@ int main() {
     // need this to be separate from BLE processing since BLE requires higher priority processing
     rtos::Thread sensor_thread(osPriorityBelowNormal);
     sensor_thread.start(mbed::callback(sensor_poll_main));
+
+//    event_queue.call_every(3000, mbed::callback(test));
 
     // Process the event queue.
     event_queue.dispatch_forever();

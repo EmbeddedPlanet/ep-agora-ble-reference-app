@@ -36,6 +36,8 @@
 #include "DeviceInformationService.h"
 #include "BME680Service.h"
 
+extern void connect_usb(void);
+
 /**
  * Handle initialization adn shutdown of the BLE Instance.
  *
@@ -158,23 +160,12 @@ private:
         event_queue.call(mbed::callback(&event->ble, &BLE::processEvents));
     }
 
-    /**
-     * Sets up adverting payload and start advertising.
-     *
-     * This function is invoked when the ble interface is initialized.
-     */
-    void when_init_complete(BLE::InitializationCompleteCallbackContext *event)
-    {
-        if (event->error) {
-            printf("Error %u during the initialization\r\n", event->error);
-            return;
-        }
-        printf("Ble instance initialized\r\n");
-
-
+    void init_security_manager(void) {
         printf("ble: initializing the security manager\n");
 
-        ble_error_t error = event->ble.securityManager().init(
+        BLE& ble = BLE::Instance();
+
+        ble_error_t error = ble.securityManager().init(
         		true,
 				false,
 				SecurityManager::IO_CAPS_NONE,
@@ -188,19 +179,40 @@ private:
         	printf("ble: error while initializing the security manager\n");
         }
 
-        event->ble.securityManager().setSecurityManagerEventHandler(this);
-        event->ble.securityManager().setPairingRequestAuthorisation(true);
-        event->ble.securityManager().allowLegacyPairing(true);
-        event->ble.securityManager().setHintFutureRoleReversal(true);
+        ble.securityManager().setSecurityManagerEventHandler(this);
+        ble.securityManager().setPairingRequestAuthorisation(true);
+        ble.securityManager().allowLegacyPairing(true);
+        ble.securityManager().setHintFutureRoleReversal(true);
 
-        error = event->ble.securityManager().preserveBondingStateOnReset(true);
+        error = ble.securityManager().preserveBondingStateOnReset(true);
         if(error) {
         	printf("ble: error during preserveBondingStateOnReset - 0x%X\n", error);
         }
 
+        printf("ble: checking whitelist\n");
+        whitelist.addresses = this->whitelist_addrs;
+        whitelist.capacity = 5;
+        whitelist.size = 0;
+        ble.securityManager().generateWhitelistFromBondTable(&whitelist);
+    }
+
+    /**
+     * Sets up adverting payload and start advertising.
+     *
+     * This function is invoked when the ble interface is initialized.
+     */
+    void when_init_complete(BLE::InitializationCompleteCallbackContext *event)
+    {
+        if (event->error) {
+            printf("Error %u during the initialization\r\n", event->error);
+            return;
+        }
+        printf("Ble instance initialized\r\n");
+
+        init_security_manager();
 
         /* Enable privacy */
-        error = event->ble.gap().enablePrivacy(true);
+        ble_error_t error = event->ble.gap().enablePrivacy(true);
         if(error) {
         	printf("ble: error enabling privacy \n");
         }
@@ -210,14 +222,6 @@ private:
 				Gap::PeripheralPrivacyConfiguration_t::PERFORM_PAIRING_PROCEDURE
         };
         event->ble.gap().setPeripheralPrivacyConfiguration(&config);
-
-
-
-        printf("ble: checking whitelist\n");
-        whitelist.addresses = this->whitelist_addrs;
-        whitelist.capacity = 5;
-        whitelist.size = 0;
-        event->ble.securityManager().generateWhitelistFromBondTable(&whitelist);
 
         if (!set_advertising_parameters()) {
             return;
@@ -250,6 +254,9 @@ private:
     	ble.securityManager().reset();
     	connected = false;
         printf("Disconnected.\r\n");
+        connect_usb();
+        // Reinitialize the security manager
+        init_security_manager();
         start_advertising();
     }
 
@@ -352,6 +359,16 @@ private:
     	printf("ble: pairing requested\n");
     	ble.securityManager().acceptPairingRequest(connectionHandle);
     }
+
+    virtual void pairingResult(ble::connection_handle_t connectionHandle,
+    		SecurityManager::SecurityCompletionStatus_t result) {
+    	if(result != SecurityManager::SecurityCompletionStatus_t::SEC_STATUS_SUCCESS) {
+    		printf("ble: pairing failed - %d\r\n", result);
+    	} else {
+    		printf("ble: pairing succeeded\r\n");
+    	}
+
+	}
 
     /** Override SecurityManagerEventHandler */
     void linkEncryptionResult(
