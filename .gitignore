@@ -7,4 +7,3 @@ BUILD/
 GettingStarted.html
 makefile.targets
 mbed_config.h
-mbed_settings.*
