@@ -1,13 +1,10 @@
 /Debug/
-ep-core/
 .cproject
 *~
-.mbed
 .project
 .settings/
 BUILD/
 GettingStarted.html
 makefile.targets
-mbed-os.lib
 mbed_config.h
 mbed_settings.*
