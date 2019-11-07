@@ -36,8 +36,6 @@
 #include "DeviceInformationService.h"
 #include "BME680Service.h"
 
-extern void connect_usb(void);
-
 /**
  * Handle initialization adn shutdown of the BLE Instance.
  *
@@ -186,10 +184,10 @@ private:
 
         error = ble.securityManager().preserveBondingStateOnReset(true);
         if(error) {
-        	printf("ble: error during preserveBondingStateOnReset - 0x%X\n", error);
+        	printf("ble: error during preserveBondingStateOnReset - 0x%X\r\n", error);
         }
 
-        printf("ble: checking whitelist\n");
+        printf("ble: checking whitelist\r\n");
         whitelist.addresses = this->whitelist_addrs;
         whitelist.capacity = 5;
         whitelist.size = 0;
@@ -214,7 +212,7 @@ private:
         /* Enable privacy */
         ble_error_t error = event->ble.gap().enablePrivacy(true);
         if(error) {
-        	printf("ble: error enabling privacy \n");
+        	printf("ble: error enabling privacy\r\n");
         }
 
         Gap::PeripheralPrivacyConfiguration_t config = {
@@ -251,10 +249,11 @@ private:
     void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
     {
     	BLE& ble = BLE::Instance();
+    	// Currently, this allows the security manager to close
+    	// the security database file and flush it to flash...
     	ble.securityManager().reset();
     	connected = false;
         printf("Disconnected.\r\n");
-        connect_usb();
         // Reinitialize the security manager
         init_security_manager();
         start_advertising();
@@ -268,11 +267,11 @@ private:
     }
 
     void whitelistFromBondTable(Gap::Whitelist_t* whitelist) {
-    	printf("ble: whitelist size - %d\n", whitelist->size);
+    	printf("ble: whitelist size - %d\r\n", whitelist->size);
     	for(int i = 0; i < whitelist->size; i++) {
     		printf("\taddress:");
     		print_address(whitelist->addresses[i]);
-    		printf("\n");
+    		printf("\r\n");
     	}
     }
 
@@ -302,7 +301,7 @@ private:
         );
 
         if (error) {
-            printf("Gap::setAdvertisingParameters() failed with error %d", error);
+            printf("Gap::setAdvertisingParameters() failed with error %d\r\n", error);
             return false;
         }
 
@@ -325,7 +324,7 @@ private:
         );
 
         if (error) {
-            printf("Gap::setAdvertisingPayload() failed with error %d", error);
+            printf("Gap::setAdvertisingPayload() failed with error %d\r\n", error);
             return false;
         }
 
@@ -335,7 +334,7 @@ private:
 				.getAdvertisingData());
 
         if (error) {
-            printf("Gap::setAdvertisingScanResponse() failed with error %d", error);
+            printf("Gap::setAdvertisingScanResponse() failed with error %d\r\n", error);
             return false;
         }
 
@@ -374,11 +373,11 @@ private:
     void linkEncryptionResult(
     		ble::connection_handle_t connectionHandle, ble::link_encryption_t result)
     {
-    	printf("ble: link %s\n",
+    	printf("ble: link %s\r\n",
     			(result == ble::link_encryption_t::ENCRYPTED? "ENCRYPTED" : "not encrypted!"));
 
     	BLE& ble = BLE::Instance();
-    	printf("ble: checking whitelist\n");
+    	printf("ble: checking whitelist\r\n");
     	ble.securityManager().generateWhitelistFromBondTable(&whitelist);
 
 
