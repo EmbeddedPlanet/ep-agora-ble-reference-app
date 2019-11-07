@@ -29,6 +29,8 @@
 #include "ble/GapAdvertisingParams.h"
 #include "ble/GapAdvertisingData.h"
 #include "ble/FunctionPointerWithContext.h"
+#include "ble/gap/Types.h"
+#include "ble/gap/Events.h"
 
 /** Services */
 #include "DeviceInformationService.h"
@@ -40,7 +42,9 @@
  * Setup advertising payload and manage advertising state.
  * Delegate to GattClientProcess once the connection is established.
  */
-class BLEProcess : private mbed::NonCopyable<BLEProcess>, public ble::Gap::EventHandler {
+class BLEProcess : private mbed::NonCopyable<BLEProcess>,
+				   public ble::Gap::EventHandler,
+				   public SecurityManager::EventHandler {
 public:
     /**
      * Construct a BLEProcess from an event queue and a ble interface.
@@ -48,9 +52,12 @@ public:
      * Call start() to initiate ble processing.
      */
     BLEProcess(events::EventQueue &event_queue, BLE &ble_interface) :
-        _event_queue(event_queue),
-        _ble_interface(ble_interface),
-        _post_init_cb()
+        event_queue(event_queue),
+        ble_interface(ble_interface),
+		connection_handle(),
+		connected(false),
+        post_init_cb(),
+		sm_file_name(NULL)
 		{
     }
 
@@ -67,28 +74,31 @@ public:
      */
     void on_init(mbed::Callback<void(BLE&)> cb)
     {
-        _post_init_cb = cb;
+        post_init_cb = cb;
     }
 
     /**
      * Initialize the ble interface, configure it and start advertising.
+     * @param[in] sm_file File name of where to store security manager data (for persistent pairing, if supported)
      */
-    bool start()
+    bool start(const char* sm_file = NULL)
     {
         printf("Ble process started.\r\n");
 
-        if (_ble_interface.hasInitialized()) {
+        if (ble_interface.hasInitialized()) {
             printf("Error: the ble instance has already been initialized.\r\n");
             return false;
         }
 
-        _ble_interface.gap().setEventHandler(this);
+        ble_interface.gap().setEventHandler(this);
 
-        _ble_interface.onEventsToProcess(
+        ble_interface.onEventsToProcess(
             makeFunctionPointer(this, &BLEProcess::schedule_ble_events)
         );
 
-        ble_error_t error = _ble_interface.init(
+        sm_file_name = sm_file;
+
+        ble_error_t error = ble_interface.init(
             this, &BLEProcess::when_init_complete
         );
 
@@ -101,14 +111,41 @@ public:
     }
 
     /**
+     * Disconnect from existing connection
+     */
+    void disconnect(void) {
+    	if(connected) {
+    		ble_error_t error = ble_interface.gap().disconnect(connection_handle,
+    				ble::local_disconnection_reason_t(ble::local_disconnection_reason_t::USER_TERMINATION));
+    		if(error) {
+    			printf("ble: error when disconnecting - 0x%X\n", error);
+    		} else {
+    			printf("ble: disconnecting from central...\n");
+    		}
+    	}
+    }
+
+    /**
+     * Purge bonding/pairing information
+     */
+    void purge_bonding_info(void) {
+    	BLE& ble = BLE::Instance();
+    	ble.securityManager().purgeAllBondingState();
+    }
+
+    /**
      * Close existing connections and stop the process.
      */
     void stop()
     {
-        if (_ble_interface.hasInitialized()) {
-            _ble_interface.shutdown();
+        if (ble_interface.hasInitialized()) {
+            ble_interface.shutdown();
             printf("Ble process stopped.");
         }
+    }
+
+    bool is_connected(void) {
+    	return connected;
     }
 
 private:
@@ -118,7 +155,43 @@ private:
      */
     void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *event)
     {
-        _event_queue.call(mbed::callback(&event->ble, &BLE::processEvents));
+        event_queue.call(mbed::callback(&event->ble, &BLE::processEvents));
+    }
+
+    void init_security_manager(void) {
+        printf("ble: initializing the security manager\n");
+
+        BLE& ble = BLE::Instance();
+
+        ble_error_t error = ble.securityManager().init(
+        		true,
+				false,
+				SecurityManager::IO_CAPS_NONE,
+				NULL,
+				false,
+				sm_file_name
+        		);
+
+
+        if(error) {
+        	printf("ble: error while initializing the security manager\n");
+        }
+
+        ble.securityManager().setSecurityManagerEventHandler(this);
+        ble.securityManager().setPairingRequestAuthorisation(true);
+        ble.securityManager().allowLegacyPairing(true);
+        ble.securityManager().setHintFutureRoleReversal(true);
+
+        error = ble.securityManager().preserveBondingStateOnReset(true);
+        if(error) {
+        	printf("ble: error during preserveBondingStateOnReset - 0x%X\r\n", error);
+        }
+
+        printf("ble: checking whitelist\r\n");
+        whitelist.addresses = this->whitelist_addrs;
+        whitelist.capacity = 5;
+        whitelist.size = 0;
+        ble.securityManager().generateWhitelistFromBondTable(&whitelist);
     }
 
     /**
@@ -134,9 +207,19 @@ private:
         }
         printf("Ble instance initialized\r\n");
 
-        Gap &gap = _ble_interface.gap();
-        gap.onConnection(this, &BLEProcess::when_connection);
-        gap.onDisconnection(this, &BLEProcess::when_disconnection);
+        init_security_manager();
+
+        /* Enable privacy */
+        ble_error_t error = event->ble.gap().enablePrivacy(true);
+        if(error) {
+        	printf("ble: error enabling privacy\r\n");
+        }
+
+        Gap::PeripheralPrivacyConfiguration_t config = {
+        		/* use_non_resolvable_random_address */ false,
+				Gap::PeripheralPrivacyConfiguration_t::DO_NOT_RESOLVE
+        };
+        event->ble.gap().setPeripheralPrivacyConfiguration(&config);
 
         if (!set_advertising_parameters()) {
             return;
@@ -150,25 +233,51 @@ private:
             return;
         }
 
-        if (_post_init_cb) {
-            _post_init_cb(_ble_interface);
+        if (post_init_cb) {
+            post_init_cb(ble_interface);
         }
     }
 
-    void when_connection(const Gap::ConnectionCallbackParams_t *connection_event)
+    /** Override Gap event handler */
+    void onConnectionComplete(const ble::ConnectionCompleteEvent &event)
     {
+    	connection_handle = event.getConnectionHandle();
+        connected = true;
         printf("Connected.\r\n");
     }
 
-    void when_disconnection(const Gap::DisconnectionCallbackParams_t *event)
+    void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
     {
+    	BLE& ble = BLE::Instance();
+    	// Currently, this allows the security manager to close
+    	// the security database file and flush it to flash...
+    	ble.securityManager().reset();
+    	connected = false;
         printf("Disconnected.\r\n");
+        // Reinitialize the security manager
+        init_security_manager();
         start_advertising();
+    }
+
+    void print_address(BLEProtocol::Address_t& addr) {
+    	for(int j = 0; j < 6; j++) { // 48-bit
+    		printf("%X", addr.address[j]);
+		}
+		printf("\n");
+    }
+
+    void whitelistFromBondTable(Gap::Whitelist_t* whitelist) {
+    	printf("ble: whitelist size - %d\r\n", whitelist->size);
+    	for(int i = 0; i < whitelist->size; i++) {
+    		printf("\taddress:");
+    		print_address(whitelist->addresses[i]);
+    		printf("\r\n");
+    	}
     }
 
     bool start_advertising(void)
     {
-        Gap &gap = _ble_interface.gap();
+        Gap &gap = ble_interface.gap();
 
         /* Start advertising the set */
         ble_error_t error = gap.startAdvertising(ble::LEGACY_ADVERTISING_HANDLE);
@@ -184,7 +293,7 @@ private:
 
     bool set_advertising_parameters()
     {
-        Gap &gap = _ble_interface.gap();
+        Gap &gap = ble_interface.gap();
 
         ble_error_t error = gap.setAdvertisingParameters(
             ble::LEGACY_ADVERTISING_HANDLE,
@@ -192,7 +301,7 @@ private:
         );
 
         if (error) {
-            printf("Gap::setAdvertisingParameters() failed with error %d", error);
+            printf("Gap::setAdvertisingParameters() failed with error %d\r\n", error);
             return false;
         }
 
@@ -201,7 +310,7 @@ private:
 
     bool set_advertising_data()
     {
-        Gap &gap = _ble_interface.gap();
+        Gap &gap = ble_interface.gap();
 
         /* Use the simple builder to construct the payload; it fails at runtime
          * if there is not enough space left in the buffer */
@@ -215,17 +324,17 @@ private:
         );
 
         if (error) {
-            printf("Gap::setAdvertisingPayload() failed with error %d", error);
+            printf("Gap::setAdvertisingPayload() failed with error %d\r\n", error);
             return false;
         }
 
         error = gap.setAdvertisingScanResponse(ble::LEGACY_ADVERTISING_HANDLE,
         		ble::AdvertisingDataSimpleBuilder<ble::LEGACY_ADVERTISING_MAX_SIZE>()
-				.setLocalService(BME680_SERVICE_UUID)
+//				.setLocalService(BME680_SERVICE_UUID)
 				.getAdvertisingData());
 
         if (error) {
-            printf("Gap::setAdvertisingScanResponse() failed with error %d", error);
+            printf("Gap::setAdvertisingScanResponse() failed with error %d\r\n", error);
             return false;
         }
 
@@ -242,9 +351,46 @@ private:
 
     }
 
-    events::EventQueue &_event_queue;
-    BLE &_ble_interface;
-    mbed::Callback<void(BLE&)> _post_init_cb;
+    /** Override SecurityManagerEventHandler */
+    void pairingRequest(ble::connection_handle_t connectionHandle)
+    {
+    	BLE& ble = BLE::Instance();
+    	printf("ble: pairing requested\n");
+    	ble.securityManager().acceptPairingRequest(connectionHandle);
+    }
+
+    virtual void pairingResult(ble::connection_handle_t connectionHandle,
+    		SecurityManager::SecurityCompletionStatus_t result) {
+    	if(result != SecurityManager::SecurityCompletionStatus_t::SEC_STATUS_SUCCESS) {
+    		printf("ble: pairing failed - %d\r\n", result);
+    	} else {
+    		printf("ble: pairing succeeded\r\n");
+    	}
+
+	}
+
+    /** Override SecurityManagerEventHandler */
+    void linkEncryptionResult(
+    		ble::connection_handle_t connectionHandle, ble::link_encryption_t result)
+    {
+    	printf("ble: link %s\r\n",
+    			(result == ble::link_encryption_t::ENCRYPTED? "ENCRYPTED" : "not encrypted!"));
+
+    	BLE& ble = BLE::Instance();
+    	printf("ble: checking whitelist\r\n");
+    	ble.securityManager().generateWhitelistFromBondTable(&whitelist);
+
+
+    }
+
+    events::EventQueue &event_queue;
+    BLE &ble_interface;
+    ble::connection_handle_t connection_handle;
+    bool connected;
+    mbed::Callback<void(BLE&)> post_init_cb;
+    const char* sm_file_name;
+    BLEProtocol::Address_t whitelist_addrs[5];
+    Gap::Whitelist_t whitelist;
 
 };
 

@@ -14,6 +14,8 @@
 #include "drivers/DigitalOut.h"
 #include "drivers/AnalogIn.h"
 
+#include "drivers/DigitalButton.h"
+
 #include "BME680_BSEC.h"
 #include "MAX44009.h"
 #include "Si7021.h"
@@ -39,6 +41,8 @@ extern mbed::DigitalOut board_led;
 
 extern mbed::AnalogIn battery_voltage_in;
 extern mbed::AnalogIn board_id_in;
+
+extern ep::DigitalButton push_button_in;
 
 /** Sensors */
 extern BME680_BSEC* bme680;

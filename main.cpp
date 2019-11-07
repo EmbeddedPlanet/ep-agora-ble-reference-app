@@ -6,12 +6,16 @@
 
 #include <stdio.h>
 
+/** Mbed */
 #include "platform/Callback.h"
 #include "platform/NonCopyable.h"
 #include "platform/mbed_wait_api.h"
 #include "rtos/Thread.h"
 #include "events/EventQueue.h"
+#include "LittleFileSystem.h"
+#include "BlockDevice.h"
 
+/** BLE */
 #include "ble/BLE.h"
 #include "ble/Gap.h"
 #include "ble/GattClient.h"
@@ -33,6 +37,12 @@
 
 #include "agora_components.h"
 
+// Prints extra sensor polling information
+#define DEBUG_SENSOR_POLLING 0
+
+// Erases the block device during filesystem initialization
+#define ERASE_BLOCK_DEVICE 0
+
 #define POLL_INTERVAL_MS 5000 // Sensor polling interval in milliseconds
 
 #define MAX_VBAT_VOLTAGE 3.3f
@@ -44,6 +54,9 @@ const char serial_number[]		= "123456789";
 const char hardware_revision[]	= "1.1";
 const char firmware_revision[]	= " ";
 const char software_revision[]	= "0.0.5";
+
+/** BLE Process */
+BLEProcess* ble_process;
 
 /** Standard Services */
 DeviceInformationService* device_info_service;
@@ -57,6 +70,15 @@ MAX44009Service max44009_service;
 VL53L0XService vl53l0x_service;
 LEDService led_service(true);
 BatteryVoltageService battery_voltage_service;
+
+/** Event Queue */
+events::EventQueue event_queue;
+
+/** BlockDevice on which the filesystem is mounted */
+BlockDevice* fsbd;
+
+/** Pairing file location */
+static const char pairing_file_name[] = "/fs/sm.dat";
 
 void start_services(BLE& ble) {
 
@@ -90,46 +112,46 @@ void init_sensors(void) {
 
 	wait_ms(100);
 
-	printf("Initializing sensors...\n");
+	printf("Initializing sensors...\r\n");
 	printf("\t BME680: ");
 
 	if(bme680->init(&sensor_i2c)) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	// No way to check this really...
-	printf("\t MAX44009: OK\n");
+	printf("\t MAX44009: OK\r\n");
 
 	printf("\t Si7021: ");
 	if(si7021.check() == 1) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t VL53L0X: ");
 	if(vl53l0x.init_sensor(DEFAULT_DEVICE_ADDRESS) == 0) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t LSM9DS1: ");
 	if(lsm9ds1.begin() != 0) {
 		lsm9ds1.calibrate();
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	printf("\t ICM20602: ");
 	icm20602.init();
 	if(icm20602.isOnline()) {
-		printf("OK\n");
+		printf("OK\r\n");
 	} else {
-		printf("FAILED\n");
+		printf("FAILED\r\n");
 	}
 
 	// Attach LED to BLE service
@@ -138,10 +160,11 @@ void init_sensors(void) {
 }
 
 void poll_sensors(void) {
+#if DEBUG_SENSOR_POLLING
 	printf("Polling sensors...\n");
+#endif
 
 	/** Poll BME680 */
-	// TODO - check if new data?
 	float temperature 	= bme680->get_temperature();
 	float pressure		= bme680->get_pressure();
 	float humidity		= bme680->get_humidity();
@@ -150,6 +173,8 @@ void poll_sensors(void) {
 	float breath_voc_eq	= bme680->get_breath_voc_equivalent();
 	float iaq_score		= bme680->get_iaq_score();
 	uint8_t iaq_acc		= bme680->get_iaq_accuracy();
+
+#if DEBUG_SENSOR_POLLING
 	printf("BME680:\n");
 	printf("\ttemperature: %.2f\n", temperature);
 	printf("\tpressure: %.2f\n", pressure);
@@ -159,6 +184,8 @@ void poll_sensors(void) {
 	printf("\tbreath voc eq: %.2f\n", breath_voc_eq);
 	printf("\tiaq score: %.2f\n", iaq_score);
 	printf("\tiaq accuracy: %i\n", iaq_acc);
+#endif
+
 	temperature *= 100;	/** Scale up before converting to integer (preserves decimal component) */
 	pressure *= 10;		/** Scale up before converting to integer (preserves decimal component) */
 	humidity *= 100;		/** Scale up before converting to integer (preserves decimal component) */
@@ -173,8 +200,12 @@ void poll_sensors(void) {
 
 	/** Poll MAX44009 */
 	float als = (float) max44009.getLUXReading();
+
+#if DEBUG_SENSOR_POLLING
 	printf("MAX44009:\n");
 	printf("\tambient light reading: %.2f\n", als);
+#endif
+
 	max44009_service.set_als_reading(als);
 
 	/** Poll Si7021 */
@@ -185,9 +216,12 @@ void poll_sensors(void) {
 	temp_si /= 10;
 	si7021_service.set_rel_humidity((uint16_t) humidity_si);
 	si7021_service.set_temp_c((int16_t) temp_si);
+
+#if DEBUG_SENSOR_POLLING
 	printf("Si7021:\n");
 	printf("\ttemperature: %lu\n", temp_si);
 	printf("\thumidity: %lu\n", humidity_si);
+#endif
 
 	/** Poll VL53L0X */
 	uint32_t distance = 0;
@@ -198,8 +232,11 @@ void poll_sensors(void) {
 		distance = 0xFFFF;
 	}
 	vl53l0x_service.set_distance((uint16_t) distance);
+
+#if DEBUG_SENSOR_POLLING
 	printf("VL53L0X:\n");
 	printf("\tdistance: %lu\n", distance);
+#endif
 
 	/** Poll LSM9DS1 */
 	LSM9DS1Service::tri_axis_reading_t reading;
@@ -207,25 +244,34 @@ void poll_sensors(void) {
 	reading.x = lsm9ds1.calcAccel(lsm9ds1.ax);
 	reading.y = lsm9ds1.calcAccel(lsm9ds1.ay);
 	reading.z = lsm9ds1.calcAccel(lsm9ds1.az);
+
+#if DEBUG_SENSOR_POLLING
 	printf("LSM9DS1:\n");
 	printf("\taccel: (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+#endif
+
 	lsm9ds1_service.set_accel_reading(reading);
 
 	lsm9ds1.readGyro();
 	reading.x = lsm9ds1.calcGyro(lsm9ds1.gx);
 	reading.y = lsm9ds1.calcGyro(lsm9ds1.gy);
 	reading.z = lsm9ds1.calcGyro(lsm9ds1.gz);
-	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	lsm9ds1_service.set_gyro_reading(reading);
 
 	lsm9ds1.readMag();
 	reading.x = lsm9ds1.calcMag(lsm9ds1.mx);
 	reading.y = lsm9ds1.calcMag(lsm9ds1.my);
 	reading.z = lsm9ds1.calcMag(lsm9ds1.mz);
+
+#if DEBUG_SENSOR_POLLING
+	printf("\tgyro:  (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
 	printf("\tmag:   (%0.2f, %0.2f, %0.2f)\n", reading.x, reading.y, reading.z);
+#endif
+
 	lsm9ds1_service.set_mag_reading(reading);
 
 	/** Poll ICM20602 */
+	// TODO - support for ICM20602
 	//icm20602.getAccXvalue();
 
 
@@ -233,12 +279,34 @@ void poll_sensors(void) {
 	battery_mon_en = 1;
 	wait_ms(10);
 	float vbat = battery_voltage_in.read() * MAX_VBAT_VOLTAGE * 2.0f;
+
+#if DEBUG_SENSOR_POLLING
 	printf("Battery Voltage:\n");
 	printf("\tVbat: %.2f V\n", vbat);
+#endif
+
 	battery_voltage_service.set_voltage(vbat);
 	battery_mon_en = 0;
 
+#if DEBUG_SENSOR_POLLING
 	printf("\n");
+#endif
+
+}
+
+void start_advertising(void) {
+	printf("ble: pairing button pressed\n");
+	if(ble_process->is_connected()) {
+		ble_process->disconnect();
+		// Disconnect handler will start advertising
+	}
+}
+
+/** Push button long press handler */
+void pb_long_press_handler(ep::ButtonIn* btn) {
+	(void) btn; // Ignore argument
+	// Disconnect and start advertising procedure -- defer to thread context
+	event_queue.call(mbed::callback(start_advertising));
 }
 
 void sensor_poll_main(void) {
@@ -250,19 +318,78 @@ void sensor_poll_main(void) {
 
 }
 
+bool create_filesystem()
+{
+
+	printf("filesystem - initializing...\n");
+
+    /* Get the default system block device */
+
+	/** Slice it so we only use part of it for the filesystem */
+	static SlicingBlockDevice sbd(BlockDevice::get_default_instance(),
+			0, (64*1024));
+	fsbd = &sbd;
+    BlockDevice& bd = *fsbd;
+
+    int err = bd.init();
+
+    if (err) {
+    	printf("filesystem: failed to initialize block device\r\n");
+        return false;
+    }
+
+#if ERASE_BLOCK_DEVICE
+
+    err = bd.erase(0, bd.size());
+    if(err) {
+    	printf("filesystem: could not erase block device\r\n");
+    	return false;
+    }
+#endif
+
+    static LittleFileSystem fs("fs");
+
+    err = fs.mount(&bd);
+
+    if (err) {
+        /* Reformat if we can't mount the filesystem */
+        printf("filesystem: no filesystem found, formatting...\r\n");
+
+        err = fs.reformat(&bd);
+
+        if (err) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int main() {
+	printf("agora: BLE application begin\r\n");
     BLE &ble_interface = BLE::Instance();
-    events::EventQueue event_queue;
+
+    /* if filesystem creation fails or there is no filesystem the security manager
+     * will fallback to storing the security database in memory */
+    if (!create_filesystem()) {
+        printf("filesystem: initialization failed!\r\n");
+    } else {
+    	printf("filesystem: initialization succeeded!\r\n");
+    }
 
     init_sensors();
 
-    BLEProcess ble_process(event_queue, ble_interface);
+    BLEProcess main_ble_process(event_queue, ble_interface);
+    ble_process = &main_ble_process;
 
-    ble_process.on_init(mbed::callback(start_services));
+    ble_process->on_init(mbed::callback(start_services));
 
     // bind the event queue to the ble interface, initialize the interface
     // and start advertising
-    ble_process.start();
+    ble_process->start(pairing_file_name);
+
+    // Attach a long press callback to the backside reset button -- starts repairing
+    push_button_in.attach_long_press_callback(mbed::callback(pb_long_press_handler));
 
     // Spin off the sensor polling thread
     // need this to be separate from BLE processing since BLE requires higher priority processing
