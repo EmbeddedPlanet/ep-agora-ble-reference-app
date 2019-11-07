@@ -217,7 +217,7 @@ private:
 
         Gap::PeripheralPrivacyConfiguration_t config = {
         		/* use_non_resolvable_random_address */ false,
-				Gap::PeripheralPrivacyConfiguration_t::PERFORM_PAIRING_PROCEDURE
+				Gap::PeripheralPrivacyConfiguration_t::DO_NOT_RESOLVE
         };
         event->ble.gap().setPeripheralPrivacyConfiguration(&config);
 
