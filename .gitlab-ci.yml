@@ -7,101 +7,22 @@ cache:
   paths:
     - BUILD/
 
-# We have 6 stages to our pipeline which are executed sequentially. Each stage has sub-steps
+# We have 1 stage to our pipeline which are executed sequentially. Each stage has sub-steps
 # which are executed in parallel.
-# - style_check
-#   - astyle
-# - test
-#   - unit_test
-# - build_bootloader
-#   - bootloader
-# - build_bootloader_legacy
-#   - bootloader_legacy
 # - build_app
 #   - main
-# - build_app_legacy
-#   - main_legacy
 stages:
-  # - style_check
-  # - test
-  # - build_bootloader
-  # - build_bootloader_legacy
   - build_app
-  # - build_app_legacy
-
-# Run the astyle check
-# astyle:
-#   stage: style_check
-#   script:
-#    - chmod +x run_astyle_check.sh
-#    - mbed deploy
-#    - ./run_astyle_check.sh
-#   tags:
-#     - docker
-
-# # Run the unit tests
-# unit_test:
-#   stage: test
-#   script:
-#    - chmod +x run_unit_tests.sh
-#    - peru sync
-#    - ./run_unit_tests.sh
-#   tags:
-#     - docker
-
-# # Compile the bootloader
-# bootloader:
-#   stage: build_bootloader
-#   script:
-#    - chmod +x build_bootloader.sh
-#    - peru sync
-#    - TARGET=EP_AGORA ./build_bootloader.sh local
-#   # Tell GitLab Runners what files to save as the compiled output (or 'artifacts')
-#   artifacts:
-#     paths:
-#       - agora-bsp/BUILD/EP_AGORA/GCC_ARM-TINY/agora-bsp-bootloader*.*
-#   tags:
-#     - docker
-
-# # Compile the bootloader (legacy)
-# bootloader_legacy:
-#   stage: build_bootloader_legacy
-#   script:
-#    - chmod +x build_bootloader.sh
-#    - peru sync
-#    - TARGET=EP_AGORA LEGACY=1 ./build_bootloader.sh local
-#   # Tell GitLab Runners what files to save as the compiled output (or 'artifacts')
-#   artifacts:
-#     paths:
-#       - agora-bsp/BUILD/EP_AGORA/GCC_ARM-TINY/agora-bsp-bootloader-legacy*.*
-#   tags:
-#     - docker
 
 # Compile main
 build_app:
   stage: build_app
   script:
-  #  - chmod +x build.sh
    - mbed deploy
    - mbed compile -t GCC_ARM -m EP_AGORA --artifact-name agora-ble-unofficial
-  #  - ./build.sh
   # Tell GitLab Runners what files to save as the compiled output (or 'artifacts')
   artifacts:
     paths:
       - BUILD/EP_AGORA/GCC_ARM*/agora-ble-unofficial*.*
   tags:
     - docker
-
-# # Compile main (legacy)
-# build_app_legacy:
-#   stage: build_app_legacy
-#   script:
-#    - chmod +x build_app.sh
-#    - peru sync
-#    - TARGET=EP_AGORA LEGACY=1 ./build_app.sh local
-#   # Tell GitLab Runners what files to save as the compiled output (or 'artifacts')
-#   artifacts:
-#     paths:
-#       - BUILD/EP_AGORA/GCC_ARM*/agora-ble-gateway-demo-legacy*.*
-#   tags:
-#     - docker
