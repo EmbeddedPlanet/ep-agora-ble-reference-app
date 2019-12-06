@@ -1,0 +1,28 @@
+# Use the Docker dev container that we also use on our laptops for development builds. This ensures
+# consistent output no matter who builds the source.
+image: registry.gitlab.com/embeddedplanet/departments/software/mbed_gcc_docker/mbed_docker_gcc:1.5.0
+
+# Cache the BUILD directory to speed up subsequent builds
+cache:
+  paths:
+    - BUILD/
+
+# We have 1 stage to our pipeline which are executed sequentially. Each stage has sub-steps
+# which are executed in parallel.
+# - build_app
+#   - main
+stages:
+  - build_app
+
+# Compile main
+build_app:
+  stage: build_app
+  script:
+   - mbed deploy
+   - mbed compile -t GCC_ARM -m EP_AGORA --artifact-name agora-ble-unofficial
+  # Tell GitLab Runners what files to save as the compiled output (or 'artifacts')
+  artifacts:
+    paths:
+      - BUILD/EP_AGORA/GCC_ARM*/agora-ble-unofficial*.*
+  tags:
+    - docker
