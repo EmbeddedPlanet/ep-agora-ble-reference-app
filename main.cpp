@@ -7,11 +7,13 @@
 #include <stdio.h>
 
 /** Mbed */
+#include "drivers/DigitalOut.h"
 #include "platform/Callback.h"
 #include "platform/NonCopyable.h"
 #include "platform/mbed_wait_api.h"
 #include "rtos/Thread.h"
 #include "events/EventQueue.h"
+#include "events/Event.h"
 #include "LittleFileSystem.h"
 #include "BlockDevice.h"
 
@@ -47,6 +49,9 @@
 
 #define MAX_VBAT_VOLTAGE 3.3f
 
+#define LED_BLINK_SLOW_MS 1000	// Slow blinking while BLE is disconnected
+#define LED_BLINK_FAST_MS 250	// Faster blinking while BLE is connected
+
 /** Device Information Strings */
 const char manufacturers_name[]	= "Embedded Planet";
 const char model_number[]		= "Agora BLE";
@@ -54,6 +59,8 @@ const char serial_number[]		= "123456789";
 const char hardware_revision[]	= "1.1";
 const char firmware_revision[]	= " ";
 const char software_revision[]	= "0.0.5";
+
+/** Hardware peripheral driver objects are declared in agora_components.h */
 
 /** BLE Process */
 BLEProcess* ble_process;
@@ -73,6 +80,10 @@ BatteryVoltageService battery_voltage_service;
 
 /** Event Queue */
 events::EventQueue event_queue;
+
+/** Blink LED Event */
+void blink_led(void);
+events::Event<void(void)> led_event(&event_queue, blink_led);
 
 /** BlockDevice on which the filesystem is mounted */
 BlockDevice* fsbd;
@@ -295,6 +306,7 @@ void poll_sensors(void) {
 }
 
 void start_advertising(void) {
+	//TODO - clear the bonding credentials storage
 	printf("ble: pairing button pressed\n");
 	if(ble_process->is_connected()) {
 		ble_process->disconnect();
@@ -365,6 +377,24 @@ bool create_filesystem()
     return true;
 }
 
+void blink_led(void) {
+	board_led = !board_led; // Toggle board LED
+}
+
+void on_ble_connect(void) {
+	// Update the period of the event
+	led_event.cancel();
+	led_event.period(LED_BLINK_FAST_MS);
+	led_event.call();
+}
+
+void on_ble_disconnect(void) {
+	// Update the period of the event
+	led_event.cancel();
+	led_event.period(LED_BLINK_SLOW_MS);
+	led_event.call();
+}
+
 int main() {
 	printf("agora: BLE application begin\r\n");
     BLE &ble_interface = BLE::Instance();
@@ -383,6 +413,8 @@ int main() {
     ble_process = &main_ble_process;
 
     ble_process->on_init(mbed::callback(start_services));
+    ble_process->on_connect_event().attach(on_ble_connect);
+    ble_process->on_disconnect_event().attach(on_ble_disconnect);
 
     // bind the event queue to the ble interface, initialize the interface
     // and start advertising
@@ -395,6 +427,10 @@ int main() {
     // need this to be separate from BLE processing since BLE requires higher priority processing
     rtos::Thread sensor_thread(osPriorityBelowNormal);
     sensor_thread.start(mbed::callback(sensor_poll_main));
+
+    // Until Bluetooth is connected, blink slowly
+    led_event.period(LED_BLINK_SLOW_MS);
+    led_event.call();
 
     // Process the event queue.
     event_queue.dispatch_forever();

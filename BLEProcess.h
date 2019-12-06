@@ -36,6 +36,9 @@
 #include "DeviceInformationService.h"
 #include "BME680Service.h"
 
+/** Extensions */
+#include "extensions/CallChain.h"
+
 /**
  * Handle initialization adn shutdown of the BLE Instance.
  *
@@ -148,6 +151,14 @@ public:
     	return connected;
     }
 
+    ep::CallChain<>& on_disconnect_event(void) {
+    	return on_disconnect_callchain;
+    }
+
+    ep::CallChain<>& on_connect_event(void) {
+    	return on_connect_callchain;
+    }
+
 private:
 
     /**
@@ -244,6 +255,7 @@ private:
     	connection_handle = event.getConnectionHandle();
         connected = true;
         printf("Connected.\r\n");
+        on_connect_callchain.call(); // Execute subscribed application handlers
     }
 
     void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
@@ -257,6 +269,8 @@ private:
         // Reinitialize the security manager
         init_security_manager();
         start_advertising();
+
+        on_disconnect_callchain.call(); // Execute subscribed application handlers
     }
 
     void print_address(BLEProtocol::Address_t& addr) {
@@ -391,6 +405,10 @@ private:
     const char* sm_file_name;
     BLEProtocol::Address_t whitelist_addrs[5];
     Gap::Whitelist_t whitelist;
+
+    // Callchain for connection & disconnection events
+    ep::CallChain<> on_connect_callchain;
+    ep::CallChain<> on_disconnect_callchain;
 
 };
 
