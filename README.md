@@ -24,7 +24,7 @@ Note: You can see detailed runtime information and debug UART output from the Ag
 The Flidor dev kit includes this functionality and enumerates as a USB to Serial adapter when connected. Use a serial terminal application, like Minicom (Linux) or TeraTerm (Windows) to
 view the debug UART output. The default settings are show in the screenshot below:
 
-
+![alt text](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/default_serial.JPG "Default Serial Settigs")
 
 When the example starts running, you should see the on-board red LED blinking slowly. This means the example successfully initialized all sensors and systems and is now advertising over BLE.
 
@@ -39,21 +39,33 @@ The screenshots below show how to interact with Agora and read sensor data over 
 
 1.) Open the app on your smartphone and drag downwards on the list to begin scanning. A device named "EP Agora" should be listed in the scan results.
 
+![Scanning](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/scan.PNG "Scanning for Agora")
+
 2.) Tap on the "EP Agora" entry to connect to your Agora board. At this time, you should notice the on-board red LED blinking faster. This indicates the Agora board has connected to a peer over BLE.
+
+![Connecting](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/connecting.PNG)
+
+![Connected](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/connected.PNG)
 
 3.) Once the app has discovered all services/characteristics, you can browse what's available over BLE. For example, to view the ambient temperature in the room,
 scroll down through the services list to find the service beginning with `00000001`, and tap on the characteristic with UUID `0x2A6E` ([Temperature](https://www.bluetooth.com/specifications/gatt/characteristics/)).
+
+![Services](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/services.PNG)
 
 4.) This will open a detailed view of the characteristic, showing its current value, and allowing you to read a new value, or subscribe to notifications on when it changes.
 By default, the data is shown in hexadecimal format. You can change this by tapping "Hex" up in the corner. On this page, you will be able to change the format to something
 more human-readable, like a `uint16`.
 
+![Temp-details](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/temp_details.PNG)
+
 5.) In my case, the current value of the sensor was `2300` in decimal. According to the BLE GATT specification for the `0x2A6E` characteristic, this value shows
 the temperature in increments of 0.01 degrees Celsius. So the ambient temperature at this moment is 23C, around standard room temperature.
 
+![Change-format](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/imgs/change-format.PNG)
+
 All of the sensors available on Agora are presented over BLE in this example. Since some of the data types are not covered by a standard GATT characteristic, you will find that many of them have custom UUIDs (128-bits long).
 
-For more information on what the custom UUIDs are and how data is represented in this example, see the BLE GATT specification for this example in the docs folder.
+For more information on what the custom UUIDs are and how data is represented in this example, see the [BLE GATT specification for this example in the docs folder](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/Agora_BLE_0v5.pdf).
 
 ## APIs and Concepts Exemplified
 
