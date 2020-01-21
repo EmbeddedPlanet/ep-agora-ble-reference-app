@@ -1,22 +1,17 @@
 # ep-agora-ble-reference-app
 Bluetooth Low Energy reference application for the EP Agora IoT module, powered by Mbed-OS
 
-This example shows how to set up Agora as a BLE GATT Server, allowing a peer to read, write, and subscribe to all available sensors/actuators on the board.
+This example allows you to connect to the Agora module over Bluetooth Low Energy (BLE) using your phone or another generic BLE client. You can then read, write, and subscribe to all available sensors and actuators on the Agora module.
 
-## Building
+## Quick Start
 
-To build the example, you must already have set up a toolchain support by Mbed, and have Mbed-CLI build tools installed. For more instructions on how to get started with Mbed development, see [associated documentation here](https://os.mbed.com/docs/mbed-os/v5.14/tools/installation-and-setup.html).
+If you got here from the quick start guide for the Embedded Planet Agora platform, follow the steps outlined under the "Example Operation" section to learn how to interact with the demo firmware app pre-flashed on your Agora development unit!
 
-After you have Mbed tools set up, you can build this example by following these steps (works with Mbed CLI, see IDE documentation for Mbed Studio):
+### Table of Contents
+- Example Operation
+- Building
+- APIs and Concepts Exemplified
 
-1.) Clone the repository: `git clone https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app.git && cd ep-agora-ble-reference-app`
-2.) Download all dependencies: `mbed new . && mbed deploy`
-3.) Set up your toolchain and target, eg: `mbed toolchain GCC_ARM && mbed target EP_AGORA`
-4.) Build the example: `mbed compile`
-
-Once the build is complete, you can upload the example to your board using the drag-and-drop programming feature of the Flidor debug board, also available from Embedded Planet.
-
-Simply drag the hex output file, `BUILD/EP_AGORA/GCC_ARM/ep_agora-ble-reference-app.hex` (exact location depends on your toolchain), and place the file on the USB storage device that shows up when you plug in the Flidor board.
 
 ## Example Operation
 
@@ -66,6 +61,21 @@ the temperature in increments of 0.01 degrees Celsius. So the ambient temperatur
 All of the sensors available on Agora are presented over BLE in this example. Since some of the data types are not covered by a standard GATT characteristic, you will find that many of them have custom UUIDs (128-bits long).
 
 For more information on what the custom UUIDs are and how data is represented in this example, see the [BLE GATT specification for this example in the docs folder](https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app/blob/master/docs/Agora_BLE_0v5.pdf).
+
+## Building
+
+To build the example, you must already have set up a toolchain support by Mbed, and have Mbed-CLI build tools installed. For more instructions on how to get started with Mbed development, see [associated documentation here](https://os.mbed.com/docs/mbed-os/v5.14/tools/installation-and-setup.html).
+
+After you have Mbed tools set up, you can build this example by following these steps (works with Mbed CLI, see IDE documentation for Mbed Studio):
+
+1. Clone the repository: `git clone https://github.com/EmbeddedPlanet/ep-agora-ble-reference-app.git && cd ep-agora-ble-reference-app`
+2. Download all dependencies: `mbed new . && mbed deploy`
+3. Set up your toolchain and target, eg: `mbed toolchain GCC_ARM && mbed target EP_AGORA`
+4. Build the example: `mbed compile`
+
+Once the build is complete, you can upload the example to your board using the drag-and-drop programming feature of the Flidor debug board, also available from Embedded Planet.
+
+Simply drag the hex output file, `BUILD/EP_AGORA/GCC_ARM/ep_agora-ble-reference-app.hex` (exact location depends on your toolchain), and place the file on the USB storage device that shows up when you plug in the Flidor board.
 
 ## APIs and Concepts Exemplified
 
