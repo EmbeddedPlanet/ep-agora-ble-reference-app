@@ -43,7 +43,7 @@
 #define DEBUG_SENSOR_POLLING 0
 
 // Erases the block device during filesystem initialization
-#define ERASE_BLOCK_DEVICE 0
+#define ERASE_BLOCK_DEVICE 1
 
 #define POLL_INTERVAL_MS 5000 // Sensor polling interval in milliseconds
 
@@ -339,7 +339,7 @@ bool create_filesystem()
 
 	/** Slice it so we only use part of it for the filesystem */
 	static SlicingBlockDevice sbd(BlockDevice::get_default_instance(),
-			0, (64*1024));
+			0, (128*1024));
 	fsbd = &sbd;
     BlockDevice& bd = *fsbd;
 
