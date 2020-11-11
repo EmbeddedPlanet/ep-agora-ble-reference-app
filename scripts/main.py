@@ -67,7 +67,7 @@ def looks_like_mac(name: str) -> bool:
         return False
 
 
-async def scan_for_name(name) -> list[BLEDevice]:
+async def scan_for_name(name):
     """
     Scans for a specifically-named BLE device nearby
     :param name: Name of device to scan for
@@ -253,11 +253,11 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
 
     # Gracefully shutdown with signal handlers (thanks roguelynn)
-    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-    for s in signals:
-        loop.add_signal_handler(
-            s, lambda s=s: asyncio.create_task(shutdown(s, loop))
-        )
+    #signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+    #for s in signals:
+    #    loop.add_signal_handler(
+    #        s, lambda s=s: asyncio.create_task(shutdown(s, loop))
+    #    )
 
     event_flag = asyncio.Event()
 
