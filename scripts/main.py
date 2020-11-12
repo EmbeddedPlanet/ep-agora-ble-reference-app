@@ -72,14 +72,14 @@ def looks_like_mac(name: str) -> bool:
         return False
 
 
-async def scan_for_name(name):
+async def scan_for_name(name, duration):
     """
     Scans for a specifically-named BLE device nearby
     :param name: Name of device to scan for
     :return: BLEDevice handle to found device, None if not found
     """
     results = []
-    devices = await BleakScanner.discover(timeout=20.0)
+    devices = await BleakScanner.discover(timeout=duration)
     for device in devices:
         if name == device.name:
             results.append(device)
@@ -118,7 +118,7 @@ async def connect_main(args):
     else:
         async with state_lock:
             state = 'Scanning'
-        agoras = await scan_for_name('EP Agora')
+        agoras = await scan_for_name('EP Agora', args.scan_duration)
         debug_logger.info(f'Found {len(agoras)} nearby Agoras over BLE')
         for i, agora in enumerate(agoras):
             debug_logger.info(f'[{i}] - {agora.address}')
@@ -253,6 +253,8 @@ if __name__ == '__main__':
     parser.add_argument('--log-file', dest='log_file',
                         help='File to log debug information of this program to. '
                              'By default it is printed to the terminal')
+    parser.add_argument('-s', '--scan-duration', dest='scan_duration', default=20.0, type=int,
+                        help='Duration to scan for in seconds. Defaults to 20 seconds')
     args = parser.parse_args()
 
     loop = asyncio.get_event_loop()
