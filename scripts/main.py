@@ -54,6 +54,11 @@ class DataEntry:
         return result
 
 
+class DummySignal:
+    def __init__(self, name):
+        self.name = name
+
+
 def looks_like_mac(name: str) -> bool:
     """
     Checks if the given name looks like a MAC address or not
@@ -268,5 +273,12 @@ if __name__ == '__main__':
         loop.create_task(print_waiting(event_flag))
         loop.run_forever()
 
+    except KeyboardInterrupt as e:
+        pass
+
     finally:
+        if sys.platform.startswith("win32"):
+            # Initiate shutdown
+            loop.create_task(shutdown(DummySignal("Winders"), loop))
+            loop.run_forever()
         loop.close()
