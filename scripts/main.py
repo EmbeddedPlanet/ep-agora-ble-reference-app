@@ -179,7 +179,7 @@ async def connect_main(args):
                 if data_entry.is_complete():
                     data_logger.info(data_entry.to_string())
                     data_entry.clear()
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(args.sampling_rate)
         except asyncio.CancelledError as e:
             cancelled = True
 
@@ -253,8 +253,10 @@ if __name__ == '__main__':
     parser.add_argument('--log-file', dest='log_file',
                         help='File to log debug information of this program to. '
                              'By default it is printed to the terminal')
-    parser.add_argument('-s', '--scan-duration', dest='scan_duration', default=20.0, type=int,
+    parser.add_argument('-s', '--scan-duration', dest='scan_duration', default=20.0, type=float,
                         help='Duration to scan for in seconds. Defaults to 20 seconds')
+    parser.add_argument('-r', '--sampling-rate', dest='sampling_rate', default=3.0, type=float,
+                        help='Set the sampling rate for data. Settings faster than 3 seconds will not work without changes to the BLE demo application!')
     args = parser.parse_args()
 
     loop = asyncio.get_event_loop()
