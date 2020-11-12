@@ -79,7 +79,7 @@ async def scan_for_name(name):
     :return: BLEDevice handle to found device, None if not found
     """
     results = []
-    devices = await BleakScanner.discover(timeout=5.0)
+    devices = await BleakScanner.discover(timeout=20.0)
     for device in devices:
         if name == device.name:
             results.append(device)
@@ -258,11 +258,12 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
 
     # Gracefully shutdown with signal handlers (thanks roguelynn)
-    #signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-    #for s in signals:
-    #    loop.add_signal_handler(
-    #        s, lambda s=s: asyncio.create_task(shutdown(s, loop))
-    #    )
+    if not sys.platform.startswith('win32'):
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+        for s in signals:
+            loop.add_signal_handler(
+                s, lambda s=s: asyncio.create_task(shutdown(s, loop))
+            )
 
     event_flag = asyncio.Event()
 
